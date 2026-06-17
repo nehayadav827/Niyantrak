@@ -1,69 +1,147 @@
 import numpy as np
+import pandas as pd
 
-from catboost import CatBoostRegressor
-from sklearn.metrics import r2_score, mean_absolute_error
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    average_precision_score
+)
 
+from src.forecasting.train_timeseries_model import (
+    FEATURES,
+    TARGET,
+    fit_hurdle_bundle,
+    tune_alert_threshold
+)
 
-FEATURES = [
-    "corridor",
-
-    "hour",
-    "weekday",
-    "month",
-
-    "hour_sin",
-    "hour_cos",
-
-    "lag_1",
-    "lag_2",
-    "lag_3",
-
-    "lag_24",
-    "lag_48",
-    "lag_72",
-    "lag_168",
-
-    "rolling_6",
-    "rolling_12",
-    "rolling_24",
-    "rolling_168",
-
-    "corridor_avg",
-    "corridor_volatility",
-
-    "zone_risk",
-    "junction_risk",
-    "cause_risk",
-    "closure_risk",
-    "cluster_risk"
-]
+from src.forecasting.forecast_predictor import (
+    predict_forecast_count
+)
 
 
-def cross_validate_timeseries(ts_df, n_splits=5):
+def evaluate_fold(
+    bundle,
+    X_test,
+    y_test
+):
+
+    pred = predict_forecast_count(
+        bundle,
+        X_test
+    )
+
+    expected_count = pred["expected_count"]
+    alert_proba = pred["alert_probability"]
+    alert_pred = pred["alert_prediction"]
+
+    y_test = y_test.astype(float)
+
+    y_alert = (
+        y_test > 0
+    ).astype(int)
+
+    mae = mean_absolute_error(
+        y_test,
+        expected_count
+    )
+
+    rmse = mean_squared_error(
+        y_test,
+        expected_count
+    ) ** 0.5
+
+    r2 = r2_score(
+        y_test,
+        expected_count
+    )
+
+    precision = precision_score(
+        y_alert,
+        alert_pred,
+        zero_division=0
+    )
+
+    recall = recall_score(
+        y_alert,
+        alert_pred,
+        zero_division=0
+    )
+
+    alert_f1 = f1_score(
+        y_alert,
+        alert_pred,
+        zero_division=0
+    )
+
+    try:
+
+        roc_auc = roc_auc_score(
+            y_alert,
+            alert_proba
+        )
+
+    except Exception:
+
+        roc_auc = 0.0
+
+    try:
+
+        pr_auc = average_precision_score(
+            y_alert,
+            alert_proba
+        )
+
+    except Exception:
+
+        pr_auc = 0.0
+
+    return {
+        "mae": float(mae),
+        "rmse": float(rmse),
+        "r2": float(r2),
+        "precision": float(precision),
+        "recall": float(recall),
+        "f1": float(alert_f1),
+        "roc_auc": float(roc_auc),
+        "pr_auc": float(pr_auc),
+    }
+
+
+def cross_validate_timeseries(
+    ts_df,
+    n_splits=5
+):
 
     print("\n" + "=" * 60)
-    print("TIME SERIES CROSS VALIDATION")
+    print("ZERO-INFLATED TIME SERIES CROSS VALIDATION")
     print("=" * 60)
 
     missing = [
-        col for col in FEATURES + ["incident_count"]
+        col
+        for col in FEATURES + [TARGET, "time_bucket"]
         if col not in ts_df.columns
     ]
 
     if missing:
+
         raise ValueError(
             "Missing columns in time-series dataset: "
             + str(missing)
         )
 
-    if "time_bucket" not in ts_df.columns:
-        raise ValueError(
-            "time_bucket column is required for true time-based validation."
-        )
-
     df = (
         ts_df
-        .sort_values(["time_bucket", "corridor"])
+        .sort_values(
+            [
+                "time_bucket",
+                "corridor"
+            ]
+        )
         .reset_index(drop=True)
         .copy()
     )
@@ -73,14 +151,14 @@ def cross_validate_timeseries(ts_df, n_splits=5):
     )
 
     if len(unique_times) < n_splits + 2:
+
         raise ValueError(
             "Not enough unique time buckets for time-series cross validation."
         )
 
     fold_size = len(unique_times) // (n_splits + 1)
 
-    r2_scores = []
-    mae_scores = []
+    results = []
 
     for fold in range(1, n_splits + 1):
 
@@ -88,8 +166,11 @@ def cross_validate_timeseries(ts_df, n_splits=5):
         test_start = train_end
 
         if fold == n_splits:
+
             test_end = len(unique_times)
+
         else:
+
             test_end = (fold + 1) * fold_size
 
         train_times = unique_times[:train_end]
@@ -97,62 +178,92 @@ def cross_validate_timeseries(ts_df, n_splits=5):
 
         train_df = df[
             df["time_bucket"].isin(train_times)
-        ]
+        ].copy()
 
         test_df = df[
             df["time_bucket"].isin(test_times)
-        ]
+        ].copy()
 
         X_train = train_df[FEATURES]
-        y_train = train_df["incident_count"]
+        y_train = train_df[TARGET]
 
         X_test = test_df[FEATURES]
-        y_test = test_df["incident_count"]
+        y_test = test_df[TARGET]
 
-        model = CatBoostRegressor(
-            iterations=700,
-            depth=6,
-            learning_rate=0.03,
-            loss_function="RMSE",
-            random_seed=42,
-            verbose=False
+        # simple fold-local threshold calibration
+        y_train_alert = (
+            y_train > 0
+        ).astype(int)
+
+        temp_bundle = fit_hurdle_bundle(
+            X_train=X_train,
+            y_train=y_train,
+            alert_threshold=0.35
         )
 
-        model.fit(
-            X_train,
-            y_train,
-            cat_features=["corridor"]
+        train_pred = predict_forecast_count(
+            temp_bundle,
+            X_train
         )
 
-        preds = model.predict(X_test)
-
-        r2 = r2_score(
-            y_test,
-            preds
+        threshold, _ = tune_alert_threshold(
+            y_true_alert=y_train_alert,
+            alert_proba=train_pred["alert_probability"]
         )
 
-        mae = mean_absolute_error(
-            y_test,
-            preds
+        bundle = fit_hurdle_bundle(
+            X_train=X_train,
+            y_train=y_train,
+            alert_threshold=threshold
         )
 
-        r2_scores.append(r2)
-        mae_scores.append(mae)
+        metrics = evaluate_fold(
+            bundle=bundle,
+            X_test=X_test,
+            y_test=y_test
+        )
+
+        results.append(metrics)
 
         print(
             f"Fold {fold}: "
-            f"R²={r2:.4f}, "
-            f"MAE={mae:.4f}, "
-            f"Train rows={len(train_df)}, "
-            f"Test rows={len(test_df)}"
+            f"MAE={metrics['mae']:.4f}, "
+            f"RMSE={metrics['rmse']:.4f}, "
+            f"R²={metrics['r2']:.4f}, "
+            f"AlertF1={metrics['f1']:.4f}, "
+            f"Recall={metrics['recall']:.4f}, "
+            f"PR-AUC={metrics['pr_auc']:.4f}, "
+            f"Train={len(train_df)}, "
+            f"Test={len(test_df)}"
         )
 
-    print("\nMean R²:", round(float(np.mean(r2_scores)), 4))
-    print("Mean MAE:", round(float(np.mean(mae_scores)), 4))
+    mean_metrics = {}
+
+    for key in results[0].keys():
+
+        mean_metrics[key] = float(
+            np.mean(
+                [
+                    row[key]
+                    for row in results
+                ]
+            )
+        )
+
+    print("\n" + "=" * 60)
+    print("MEAN CROSS VALIDATION RESULTS")
+    print("=" * 60)
+
+    print(f"Mean MAE       : {mean_metrics['mae']:.4f}")
+    print(f"Mean RMSE      : {mean_metrics['rmse']:.4f}")
+    print(f"Mean R²        : {mean_metrics['r2']:.4f}")
+    print(f"Mean Precision : {mean_metrics['precision']:.4f}")
+    print(f"Mean Recall    : {mean_metrics['recall']:.4f}")
+    print(f"Mean Alert F1  : {mean_metrics['f1']:.4f}")
+    print(f"Mean ROC-AUC   : {mean_metrics['roc_auc']:.4f}")
+    print(f"Mean PR-AUC    : {mean_metrics['pr_auc']:.4f}")
 
     return {
-        "mean_r2": float(np.mean(r2_scores)),
-        "mean_mae": float(np.mean(mae_scores)),
-        "fold_r2": r2_scores,
-        "fold_mae": mae_scores
+        "folds": results,
+        "mean": mean_metrics
     }

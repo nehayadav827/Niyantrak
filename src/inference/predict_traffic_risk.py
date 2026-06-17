@@ -471,22 +471,48 @@ def predict_traffic_risk():
         profile=profile
     )
 
-    predicted_incidents = float(
-        model.predict(X)[0]
+    from src.forecasting.forecast_predictor import (
+        predict_single_forecast
+    )
+
+    predicted_incidents, forecast_details = predict_single_forecast(
+        model,
+        X
     )
 
     predicted_incidents = max(
         predicted_incidents,
         0.0
     )
+    alert_probability = None
+
+    if (
+            forecast_details.get("alert_probability") is not None
+    ):
+        alert_probability = float(
+            forecast_details["alert_probability"][0]
+        )
+
+    context_multiplier = 1.0
+
+    if corridor.strip().lower() == "non-corridor":
+        context_multiplier = 0.65
 
     forecast_risk_score, forecast_risk_level = calculate_forecast_risk_score(
         predicted_incidents=predicted_incidents,
         incident_p95=store.get(
             "incident_p95",
             1.0
-        )
+        ),
+        incident_p99=store.get(
+            "incident_p99",
+            None
+        ),
+        alert_probability=alert_probability,
+        context_multiplier=context_multiplier
     )
+
+
 
     rush_hour = (
         (7 <= hour <= 10)

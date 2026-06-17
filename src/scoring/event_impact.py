@@ -63,7 +63,7 @@ def calculate_event_impact(
         8
     )
 
-    closure_score = 30 if road_closure else 0
+    closure_score = 45 if road_closure else 0
 
     rush_score = 15 if rush_hour else 0
 
