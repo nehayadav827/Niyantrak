@@ -1,0 +1,108 @@
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ============================================================
+# Django
+# ============================================================
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Static/media generated files
+staticfiles/
+media/
+
+# ============================================================
+# Environment variables
+# ============================================================
+.env
+.env.local
+.env.production
+.env.development
+
+# ============================================================
+# ML model artifacts
+# Keep models out of Git unless needed for demo submission
+# ============================================================
+models/*.pkl
+models/*.joblib
+models/*.cbm
+models/*.model
+
+# If you want to keep empty models folder
+!models/.gitkeep
+
+# ============================================================
+# Dataset files
+# Usually do not push raw datasets
+# ============================================================
+data/*.csv
+data/*.xlsx
+data/*.xls
+data/*.parquet
+data/*.json
+
+# If you want to keep empty data folder
+!data/.gitkeep
+
+# ============================================================
+# Generated plots / reports
+# ============================================================
+feature_importance.png
+forecast_feature_importance.png
+shap_summary.png
+*.html
+*.pdf
+
+# ============================================================
+# Jupyter / notebooks
+# ============================================================
+.ipynb_checkpoints/
+*.ipynb
+
+# ============================================================
+# IDE / Editor
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ============================================================
+# OS files
+# ============================================================
+.DS_Store
+Thumbs.db
+
+# ============================================================
+# Cache / test / coverage
+# ============================================================
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ============================================================
+# CatBoost generated files
+# ============================================================
+catboost_info/
