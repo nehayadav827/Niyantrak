@@ -9,12 +9,18 @@ import pandas as pd
 from django.conf import settings
 
 from src.scoring.event_impact import calculate_event_impact
+
 from src.scoring.risk_score import (
     calculate_forecast_risk_score,
     calculate_final_operational_risk
 )
+
 from src.routing.diversion_engine import recommend_diversions
 
+
+# ============================================================
+# PATHS
+# ============================================================
 
 BASE_DIR = Path(settings.BASE_DIR)
 
@@ -29,6 +35,11 @@ FEATURE_STORE_PATH = (
     / "traffic_feature_store.pkl"
 )
 
+
+# ============================================================
+# MODEL FEATURES
+# Must match the exact training feature order.
+# ============================================================
 
 FEATURES = [
     "corridor",
@@ -64,6 +75,19 @@ FEATURES = [
 ]
 
 
+# ============================================================
+# SIMPLE CACHE
+# Avoid loading model/store again and again for every request.
+# ============================================================
+
+_MODEL_CACHE = None
+_STORE_CACHE = None
+
+
+# ============================================================
+# BASIC HELPERS
+# ============================================================
+
 def parse_bool(value):
 
     value = str(value).strip().lower()
@@ -77,6 +101,25 @@ def parse_bool(value):
     ]
 
 
+def safe_float(value, fallback=0.0):
+
+    try:
+
+        if value is None:
+            return fallback
+
+        value = str(value).strip()
+
+        if value == "":
+            return fallback
+
+        return float(value)
+
+    except Exception:
+
+        return fallback
+
+
 def make_key(
     corridor,
     hour
@@ -87,27 +130,42 @@ def make_key(
 
 def load_model():
 
+    global _MODEL_CACHE
+
+    if _MODEL_CACHE is not None:
+        return _MODEL_CACHE
+
     for path in MODEL_PATHS:
 
         if os.path.exists(path):
-            return joblib.load(path)
+
+            _MODEL_CACHE = joblib.load(path)
+
+            return _MODEL_CACHE
 
     raise FileNotFoundError(
-        "Forecast model not found. Run train_all.py first."
+        "Forecast model not found. Run:\n"
+        "python train_all.py"
     )
 
 
 def load_feature_store():
 
+    global _STORE_CACHE
+
+    if _STORE_CACHE is not None:
+        return _STORE_CACHE
+
     if not os.path.exists(FEATURE_STORE_PATH):
 
         raise FileNotFoundError(
-            "Feature store not found. Run prepare_feature_store.py first."
+            "Feature store not found. Run:\n"
+            "python prepare_feature_store.py"
         )
 
-    return joblib.load(
-        FEATURE_STORE_PATH
-    )
+    _STORE_CACHE = joblib.load(FEATURE_STORE_PATH)
+
+    return _STORE_CACHE
 
 
 def resolve_corridor_name(
@@ -135,6 +193,10 @@ def resolve_corridor_name(
     return str(corridor).strip()
 
 
+# ============================================================
+# FEATURE STORE PROFILE LOOKUP
+# ============================================================
+
 def find_nearest_hour_profile(
     store,
     corridor,
@@ -151,20 +213,24 @@ def find_nearest_hour_profile(
     for key in profiles.keys():
 
         try:
+
             c, h = key.rsplit(
                 "__",
                 1
             )
 
             if c == corridor:
+
                 available_hours.append(
                     int(h)
                 )
 
         except ValueError:
+
             continue
 
     if not available_hours:
+
         return None, None
 
     nearest_hour = min(
@@ -249,6 +315,10 @@ def get_profile(
     )
 
 
+# ============================================================
+# MODEL INPUT ROW
+# ============================================================
+
 def build_input_row(
     corridor,
     hour,
@@ -270,24 +340,31 @@ def build_input_row(
     for feature in FEATURES:
 
         if feature == "corridor":
+
             row[feature] = corridor
 
         elif feature == "hour":
+
             row[feature] = hour
 
         elif feature == "weekday":
+
             row[feature] = weekday
 
         elif feature == "month":
+
             row[feature] = month
 
         elif feature == "hour_sin":
+
             row[feature] = hour_sin
 
         elif feature == "hour_cos":
+
             row[feature] = hour_cos
 
         else:
+
             row[feature] = profile.get(
                 feature,
                 0.0
@@ -299,6 +376,10 @@ def build_input_row(
     )
 
 
+# ============================================================
+# RECOMMENDATION HELPERS
+# ============================================================
+
 def recommend_resources(
     final_risk_level,
     predicted_incidents,
@@ -306,32 +387,40 @@ def recommend_resources(
 ):
 
     if final_risk_level == "LOW":
+
         officers = 2
         barricades = 0
 
     elif final_risk_level == "MODERATE":
+
         officers = 4
         barricades = 1
 
     elif final_risk_level == "HIGH":
+
         officers = 6
         barricades = 2
 
     else:
+
         officers = 8
         barricades = 4
 
     if predicted_incidents >= 3:
+
         officers += 1
 
     if predicted_incidents >= 5:
+
         barricades += 1
 
     if predicted_incidents >= 8:
+
         officers += 2
         barricades += 1
 
     if road_closure:
+
         officers += 1
         barricades += 2
 
@@ -344,22 +433,34 @@ def get_action_message(
 ):
 
     if final_risk_level == "LOW":
+
         return "Normal monitoring is sufficient."
 
     if final_risk_level == "MODERATE":
+
         return "Increase patrol visibility and monitor CCTV feeds."
 
     if final_risk_level == "HIGH":
 
         if road_closure:
-            return "Deploy officers, prepare barricades, and keep diversion support ready."
 
-        return "Deploy traffic officers and prepare diversion support."
+            return (
+                "Deploy officers, prepare barricades, and keep diversion support ready."
+            )
+
+        return (
+            "Deploy traffic officers and prepare diversion support."
+        )
 
     if road_closure:
-        return "Immediate deployment required. Activate barricading and diversion plan."
 
-    return "Immediate deployment required. Deploy officers and monitor corridor continuously."
+        return (
+            "Immediate deployment required. Activate barricading and diversion plan."
+        )
+
+    return (
+        "Immediate deployment required. Deploy officers and monitor corridor continuously."
+    )
 
 
 def normalize_timestamp(
@@ -367,14 +468,17 @@ def normalize_timestamp(
 ):
 
     if not timestamp_string:
+
         return datetime.now()
 
     try:
+
         return datetime.fromisoformat(
             timestamp_string
         )
 
     except Exception:
+
         return datetime.now()
 
 
@@ -387,18 +491,93 @@ def estimate_duration_minutes(
     base = 30 + predicted_incidents * 20
 
     if final_risk_level == "HIGH":
+
         base += 20
 
     elif final_risk_level == "CRITICAL":
+
         base += 40
 
     if road_closure:
+
         base += 30
 
     return int(
-        max(15, min(base, 240))
+        max(
+            15,
+            min(base, 240)
+        )
     )
 
+
+def estimate_affected_radius_meters(
+    final_risk_level,
+    predicted_incidents,
+    road_closure,
+    event_cause
+):
+
+    event_cause = (
+        str(event_cause)
+        .strip()
+        .lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+
+    if final_risk_level == "LOW":
+
+        base_radius = 250
+
+    elif final_risk_level == "MODERATE":
+
+        base_radius = 500
+
+    elif final_risk_level == "HIGH":
+
+        base_radius = 900
+
+    else:
+
+        base_radius = 1400
+
+    if road_closure:
+
+        base_radius += 500
+
+    if predicted_incidents >= 3:
+
+        base_radius += 300
+
+    if predicted_incidents >= 6:
+
+        base_radius += 500
+
+    high_spread_causes = [
+        "accident",
+        "congestion",
+        "vip_movement",
+        "protest",
+        "procession",
+        "public_event",
+        "water_logging"
+    ]
+
+    if event_cause in high_spread_causes:
+
+        base_radius += 300
+
+    return int(
+        min(
+            max(base_radius, 200),
+            3000
+        )
+    )
+
+
+# ============================================================
+# MAIN ENGINE
+# ============================================================
 
 def predict_event_impact(payload):
 
@@ -456,6 +635,26 @@ def predict_event_impact(payload):
         )
     )
 
+    latitude = safe_float(
+        payload.get("latitude"),
+        12.9716
+    )
+
+    longitude = safe_float(
+        payload.get("longitude"),
+        77.5946
+    )
+
+    end_latitude = safe_float(
+        payload.get("end_latitude"),
+        None
+    )
+
+    end_longitude = safe_float(
+        payload.get("end_longitude"),
+        None
+    )
+
     profile, profile_source, matched_hour = get_profile(
         store,
         corridor,
@@ -500,6 +699,11 @@ def predict_event_impact(payload):
         rush_hour=rush_hour
     )
 
+    # ========================================================
+    # FORM-LEVEL OPERATIONAL BOOSTS
+    # Priority and event type are available in the UI.
+    # ========================================================
+
     priority_boost = {
         "low": 0,
         "medium": 4,
@@ -519,9 +723,30 @@ def predict_event_impact(payload):
     )
 
     event_score = min(
-        event_score + priority_boost + event_type_boost,
+        event_score
+        +
+        priority_boost
+        +
+        event_type_boost,
         100
     )
+
+    # Recompute event level after boosts
+    if event_score < 25:
+
+        event_level = "LOW"
+
+    elif event_score < 50:
+
+        event_level = "MODERATE"
+
+    elif event_score < 75:
+
+        event_level = "HIGH"
+
+    else:
+
+        event_level = "CRITICAL"
 
     final_score, final_level = calculate_final_operational_risk(
         forecast_risk_score=forecast_score,
@@ -546,9 +771,32 @@ def predict_event_impact(payload):
         road_closure=road_closure
     )
 
+    affected_radius = estimate_affected_radius_meters(
+        final_risk_level=final_level,
+        predicted_incidents=predicted_incidents,
+        road_closure=road_closure,
+        event_cause=event_cause
+    )
+
+    secondary_radius = int(
+        affected_radius * 1.75
+    )
+
     action = get_action_message(
         final_risk_level=final_level,
         road_closure=road_closure
+    )
+
+    closure_probability = min(
+        max(
+            (
+                forecast_score * 0.35
+                +
+                event_score * 0.65
+            ) / 100,
+            0
+        ),
+        1
     )
 
     return {
@@ -564,6 +812,10 @@ def predict_event_impact(payload):
             "weekday": weekday,
             "month": month,
             "road_closure": road_closure,
+            "latitude": latitude,
+            "longitude": longitude,
+            "end_latitude": end_latitude,
+            "end_longitude": end_longitude,
         },
 
         "forecast": {
@@ -575,13 +827,16 @@ def predict_event_impact(payload):
         "event": {
             "event_score": event_score,
             "event_level": event_level,
+            "rush_hour": rush_hour,
         },
 
         "final": {
             "final_score": final_score,
             "final_level": final_level,
             "duration_minutes": duration,
-            "closure_probability": forecast_score / 100,
+            "closure_probability": closure_probability,
+            "affected_radius_m": affected_radius,
+            "secondary_radius_m": secondary_radius,
         },
 
         "history": {
@@ -606,6 +861,15 @@ def predict_event_impact(payload):
         },
 
         "diversion": diversion,
+
+        "map": {
+            "latitude": latitude,
+            "longitude": longitude,
+            "end_latitude": end_latitude,
+            "end_longitude": end_longitude,
+            "affected_radius_m": affected_radius,
+            "secondary_radius_m": secondary_radius,
+        },
 
         "action": action,
     }
