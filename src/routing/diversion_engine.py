@@ -6,54 +6,44 @@ def build_corridor_graph():
     graph = nx.Graph()
 
     edges = [
-
-        # ORR / East side
         ("ORR East 1", "ORR East 2"),
         ("ORR East 1", "Old Airport Road"),
         ("ORR East 1", "Varthur Road"),
         ("ORR East 2", "Old Madras Road"),
         ("ORR East 2", "Hosur Road"),
 
-        # ORR / North side
         ("ORR North 1", "ORR North 2"),
         ("ORR North 1", "Bellary Road 1"),
         ("ORR North 2", "Hennur Main Road"),
         ("ORR North 2", "IRR(Thanisandra road)"),
 
-        # Bellary / Airport side
         ("Bellary Road 1", "Bellary Road 2"),
         ("Bellary Road 2", "Airport New South Road"),
         ("Bellary Road 1", "CBD 1"),
         ("Bellary Road 2", "ORR North 1"),
 
-        # West side
         ("Tumkur Road", "West of Chord Road"),
         ("Tumkur Road", "ORR West 1"),
         ("West of Chord Road", "Magadi Road"),
         ("ORR West 1", "Mysore Road"),
 
-        # South / Mysore side
         ("Mysore Road", "Magadi Road"),
         ("Mysore Road", "CBD 2"),
         ("Mysore Road", "Bannerghata Road"),
 
-        # CBD
         ("CBD 1", "CBD 2"),
         ("CBD 1", "Old Airport Road"),
         ("CBD 2", "Hosur Road"),
         ("CBD 2", "Bannerghata Road"),
 
-        # South / Hosur side
         ("Hosur Road", "Bannerghata Road"),
         ("Hosur Road", "ORR East 2"),
         ("Bannerghata Road", "ORR West 1"),
 
-        # Old Madras / East
         ("Old Madras Road", "Varthur Road"),
         ("Old Madras Road", "ORR East 2"),
         ("Varthur Road", "Old Airport Road"),
 
-        # Generic fallback
         ("Non-corridor", "CBD 1"),
         ("Non-corridor", "CBD 2"),
         ("Non-corridor", "ORR East 1"),
@@ -114,12 +104,6 @@ def rank_candidates(
     candidates,
     affected_corridor
 ):
-    """
-    Rank diversion candidates.
-
-    Non-corridor should not become primary detour
-    unless affected corridor itself is Non-corridor.
-    """
 
     def score(node):
 
@@ -184,7 +168,6 @@ def recommend_diversions(
             "support_corridors": []
         }
 
-    # Two-hop support corridors
     two_hop = []
 
     for neighbor in neighbors:
@@ -216,15 +199,12 @@ def recommend_diversions(
     primary = ranked_neighbors[0]
 
     if len(ranked_neighbors) > 1:
-
         secondary = ranked_neighbors[1]
 
     elif ranked_two_hop:
-
         secondary = ranked_two_hop[0]
 
     else:
-
         secondary = "Local service road"
 
     support_corridors = []
@@ -241,16 +221,16 @@ def recommend_diversions(
         corridor
         for corridor in get_unique_list(support_corridors)
         if (
-                corridor not in [
-            affected_corridor,
-            primary,
-            secondary
-        ]
-                and
-                (
-                        corridor != "Non-corridor"
-                        or affected_corridor == "Non-corridor"
-                )
+            corridor not in [
+                affected_corridor,
+                primary,
+                secondary
+            ]
+            and
+            (
+                corridor != "Non-corridor"
+                or affected_corridor == "Non-corridor"
+            )
         )
     ]
 

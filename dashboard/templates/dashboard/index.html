@@ -1,0 +1,338 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Traffic Intelligence Engine</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{% static 'dashboard/style.css' %}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+
+<body>
+<div class="liquid-bg">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+    <div class="loading-text">Processing Traffic Intelligence...</div>
+</div>
+
+<div class="page">
+    <header class="hero">
+        <h1>Intelligent Event-Driven Traffic Management</h1>
+        <p class="subtitle">
+            Forecast event impact, deployment needs, barricading, and diversion using ML + rule-based decision intelligence.
+        </p>
+    </header>
+
+    {% if error %}
+        <div class="error-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            {{ error }}
+        </div>
+    {% endif %}
+
+    <div class="demo-row">
+        <button type="button" class="glass-btn" onclick="loadScenario('planned')">Planned Public Event</button>
+        <button type="button" class="glass-btn" onclick="loadScenario('breakdown')">Unplanned Breakdown</button>
+        <button type="button" class="glass-btn" onclick="loadScenario('vip')">VIP Movement</button>
+    </div>
+
+    <form method="POST" class="form-card" id="predict-form">
+        {% csrf_token %}
+        <div class="grid">
+            <div class="field">
+                <label>Event type</label>
+                <select name="event_type" id="event_type">
+                    <option value="planned" {% if form.event_type == "planned" %}selected{% endif %}>planned</option>
+                    <option value="unplanned" {% if form.event_type == "unplanned" %}selected{% endif %}>unplanned</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Event cause</label>
+                <select name="event_cause" id="event_cause">
+                    <option value="vehicle_breakdown" {% if form.event_cause == "vehicle_breakdown" %}selected{% endif %}>vehicle_breakdown</option>
+                    <option value="accident" {% if form.event_cause == "accident" %}selected{% endif %}>accident</option>
+                    <option value="congestion" {% if form.event_cause == "congestion" %}selected{% endif %}>congestion</option>
+                    <option value="construction" {% if form.event_cause == "construction" %}selected{% endif %}>construction</option>
+                    <option value="public_event" {% if form.event_cause == "public_event" %}selected{% endif %}>public_event</option>
+                    <option value="vip_movement" {% if form.event_cause == "vip_movement" %}selected{% endif %}>vip_movement</option>
+                    <option value="protest" {% if form.event_cause == "protest" %}selected{% endif %}>protest</option>
+                    <option value="water_logging" {% if form.event_cause == "water_logging" %}selected{% endif %}>water_logging</option>
+                    <option value="tree_fall" {% if form.event_cause == "tree_fall" %}selected{% endif %}>tree_fall</option>
+                    <option value="others" {% if form.event_cause == "others" %}selected{% endif %}>others</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Priority</label>
+                <select name="priority" id="priority">
+                    <option value="Low" {% if form.priority == "Low" %}selected{% endif %}>Low</option>
+                    <option value="Medium" {% if form.priority == "Medium" %}selected{% endif %}>Medium</option>
+                    <option value="High" {% if form.priority == "High" %}selected{% endif %}>High</option>
+                    <option value="Critical" {% if form.priority == "Critical" %}selected{% endif %}>Critical</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Latitude</label>
+                <input type="number" step="any" name="latitude" id="latitude" value="{{ form.latitude }}" required>
+            </div>
+            <div class="field">
+                <label>Longitude</label>
+                <input type="number" step="any" name="longitude" id="longitude" value="{{ form.longitude }}" required>
+            </div>
+            <div class="field">
+                <label>Corridor</label>
+                <select name="corridor" id="corridor">
+                    <option value="Non-corridor" {% if form.corridor == "Non-corridor" %}selected{% endif %}>Non-corridor</option>
+                    <option value="ORR East 1" {% if form.corridor == "ORR East 1" %}selected{% endif %}>ORR East 1</option>
+                    <option value="ORR East 2" {% if form.corridor == "ORR East 2" %}selected{% endif %}>ORR East 2</option>
+                    <option value="Mysore Road" {% if form.corridor == "Mysore Road" %}selected{% endif %}>Mysore Road</option>
+                    <option value="CBD 1" {% if form.corridor == "CBD 1" %}selected{% endif %}>CBD 1</option>
+                    <option value="CBD 2" {% if form.corridor == "CBD 2" %}selected{% endif %}>CBD 2</option>
+                    <option value="Hosur Road" {% if form.corridor == "Hosur Road" %}selected{% endif %}>Hosur Road</option>
+                    <option value="Old Airport Road" {% if form.corridor == "Old Airport Road" %}selected{% endif %}>Old Airport Road</option>
+                    <option value="Old Madras Road" {% if form.corridor == "Old Madras Road" %}selected{% endif %}>Old Madras Road</option>
+                    <option value="Tumkur Road" {% if form.corridor == "Tumkur Road" %}selected{% endif %}>Tumkur Road</option>
+                    <option value="Bellary Road 1" {% if form.corridor == "Bellary Road 1" %}selected{% endif %}>Bellary Road 1</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>End latitude (optional)</label>
+                <input type="number" step="any" name="end_latitude" id="end_latitude" value="{{ form.end_latitude }}">
+            </div>
+            <div class="field">
+                <label>End longitude (optional)</label>
+                <input type="number" step="any" name="end_longitude" id="end_longitude" value="{{ form.end_longitude }}">
+            </div>
+            <div class="field">
+                <label>Vehicle type (optional)</label>
+                <select name="veh_type" id="veh_type">
+                    <option value="" {% if form.veh_type == "" %}selected{% endif %}>—</option>
+                    <option value="bmtc_bus" {% if form.veh_type == "bmtc_bus" %}selected{% endif %}>bmtc_bus</option>
+                    <option value="heavy_vehicle" {% if form.veh_type == "heavy_vehicle" %}selected{% endif %}>heavy_vehicle</option>
+                    <option value="truck" {% if form.veh_type == "truck" %}selected{% endif %}>truck</option>
+                    <option value="private_bus" {% if form.veh_type == "private_bus" %}selected{% endif %}>private_bus</option>
+                    <option value="lcv" {% if form.veh_type == "lcv" %}selected{% endif %}>lcv</option>
+                    <option value="private_car" {% if form.veh_type == "private_car" %}selected{% endif %}>private_car</option>
+                    <option value="taxi" {% if form.veh_type == "taxi" %}selected{% endif %}>taxi</option>
+                    <option value="auto" {% if form.veh_type == "auto" %}selected{% endif %}>auto</option>
+                    <option value="others" {% if form.veh_type == "others" %}selected{% endif %}>others</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Police station (optional)</label>
+                <input type="text" name="police_station" id="police_station" value="{{ form.police_station }}">
+            </div>
+            <div class="field">
+                <label>Timestamp</label>
+                <input type="datetime-local" name="timestamp" id="timestamp" value="{{ form.timestamp }}">
+            </div>
+            <div class="field">
+                <label>Requires road closure</label>
+                <select name="requires_road_closure" id="requires_road_closure">
+                    <option value="no" {% if form.requires_road_closure == "no" %}selected{% endif %}>No</option>
+                    <option value="yes" {% if form.requires_road_closure == "yes" %}selected{% endif %}>Yes</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="primary-btn" type="submit">
+            <span class="btn-text">Predict Event Impact</span>
+            <span class="glow-effect"></span>
+        </button>
+    </form>
+
+    <div class="content-split">
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        {% if result %}
+        <div class="results-container">
+            <div class="cards">
+                <div class="card highlight fade-in">
+                    <h2>Traffic Impact Matrix</h2>
+                    <div class="kv">
+                        <span>Severity Level</span>
+                        <strong class="badge severity-{{ result.final.final_level|lower }}">{{ result.final.final_level }}</strong>
+                    </div>
+                    <div class="kv">
+                        <span>Estimated Duration</span>
+                        <strong class="mono">~{{ result.final.duration_minutes }} min</strong>
+                    </div>
+                    <div class="kv">
+                        <span>Corridor Affected</span>
+                        <strong class="mono">{{ result.input.corridor }}</strong>
+                    </div>
+                    <div class="kv">
+                        <span>Forecast Risk</span>
+                        <strong class="mono">{{ result.forecast.forecast_score|floatformat:1 }}%</strong>
+                    </div>
+                    <div class="kv">
+                        <span>Event Impact</span>
+                        <strong class="mono">{{ result.event.event_score|floatformat:1 }}%</strong>
+                    </div>
+                    <div class="kv">
+                        <span>Final Risk Score</span>
+                        <strong class="mono highlight-text">{{ result.final.final_score|floatformat:1 }}%</strong>
+                    </div>
+                </div>
+
+                <div class="card fade-in" style="animation-delay: 0.1s;">
+                    <h2>Resource Allocation</h2>
+                    <div class="kv">
+                        <span>Personnel Required</span>
+                        <strong class="mono">{{ result.resources.officers }} Officers</strong>
+                    </div>
+                    <div class="kv">
+                        <span>Primary Station</span>
+                        <strong class="mono">{{ result.resources.station }}</strong>
+                    </div>
+                    <div class="kv">
+                        <span>Shift Extension</span>
+                        <strong class="mono">{{ result.resources.shift_hours }}h</strong>
+                    </div>
+                    <ul class="task-list">
+                        <li><span>•</span> {{ result.resources.station }} — Primary control</li>
+                        <li><span>•</span> {{ result.resources.station }} — Secondary monitor</li>
+                        <li><span>•</span> {{ result.resources.station }} — Junction approach</li>
+                    </ul>
+                </div>
+
+                <div class="card fade-in" style="animation-delay: 0.2s;">
+                    <h2>Barricading Protocol</h2>
+                    <div class="kv">
+                        <span>Action Required</span>
+                        <strong>
+                            {% if result.resources.barricades > 0 %}
+                                <span class="badge required">Yes</span>
+                            {% else %}
+                                <span class="badge none">No</span>
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div class="kv">
+                        <span>Units Needed</span>
+                        <strong class="mono">{{ result.resources.barricades }}</strong>
+                    </div>
+                    <div class="kv">
+                        <span>Closure Probability</span>
+                        <strong class="mono">{{ result.final.closure_probability|floatformat:2 }}</strong>
+                    </div>
+                </div>
+
+                <div class="card fade-in" style="animation-delay: 0.3s;">
+                    <h2>Diversion Routes</h2>
+                    <div class="kv">
+                        <span>Primary Detour</span>
+                        <strong class="mono">{{ result.diversion.primary_detour }}</strong>
+                    </div>
+                    <div class="kv">
+                        <span>Secondary Detour</span>
+                        <strong class="mono">{{ result.diversion.secondary_detour }}</strong>
+                    </div>
+                    <p class="muted terminal-text">> {{ result.diversion.message }}</p>
+                    <div class="support-corridors">
+                        <span>Support Corridors:</span>
+                        <div class="tags">
+                            {% for c in result.diversion.support_corridors %}
+                                <span class="tag">{{ c }}</span>
+                            {% empty %}
+                                <span class="tag none">None</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card full fade-in" style="animation-delay: 0.4s;">
+                    <h2>Intelligence Recommendation</h2>
+                    <p class="recommendation-text">{{ result.action }}</p>
+
+                    <h3 class="terminal-header">> Historical Context Context Variables</h3>
+                    <div class="history-grid">
+                        <div class="h-metric"><span>Profile</span><strong class="mono">{{ result.history.profile_source }}</strong></div>
+                        <div class="h-metric"><span>Lag 1h</span><strong class="mono">{{ result.history.lag_1|floatformat:2 }}</strong></div>
+                        <div class="h-metric"><span>Lag 24h</span><strong class="mono">{{ result.history.lag_24|floatformat:2 }}</strong></div>
+                        <div class="h-metric"><span>Roll 6h</span><strong class="mono">{{ result.history.rolling_6|floatformat:2 }}</strong></div>
+                        <div class="h-metric"><span>Roll 24h</span><strong class="mono">{{ result.history.rolling_24|floatformat:2 }}</strong></div>
+                        <div class="h-metric"><span>Avg</span><strong class="mono">{{ result.history.corridor_avg|floatformat:2 }}</strong></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Show Loading state on form submission
+    document.getElementById('predict-form').addEventListener('submit', function() {
+        document.getElementById('loading-overlay').style.display = 'flex';
+    });
+
+    const lat = parseFloat("{{ form.latitude|default:'12.9716' }}");
+    const lon = parseFloat("{{ form.longitude|default:'77.5946' }}");
+    const endLatRaw = "{{ form.end_latitude }}";
+    const endLonRaw = "{{ form.end_longitude }}";
+
+    const map = L.map("map").setView([lat, lon], 14);
+
+    // Standard map, but heavily styled in CSS via filters for dark mode
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "Leaflet | © OpenStreetMap"
+    }).addTo(map);
+
+    const marker = L.marker([lat, lon]).addTo(map);
+    marker.bindPopup("<b style='color:#111827'>Event location</b>").openPopup();
+
+    L.circle([lat, lon], {
+        radius: 350,
+        color: "#06b6d4", // Cyan
+        fillColor: "#06b6d4",
+        fillOpacity: 0.15
+    }).addTo(map);
+
+    if (endLatRaw && endLonRaw) {
+        const endLat = parseFloat(endLatRaw);
+        const endLon = parseFloat(endLonRaw);
+        if (!Number.isNaN(endLat) && !Number.isNaN(endLon)) {
+            L.marker([endLat, endLon]).addTo(map).bindPopup("<b style='color:#111827'>End location</b>");
+            L.polyline([[lat, lon], [endLat, endLon]], {
+                color: "#8b5cf6", // Purple
+                weight: 4,
+                dashArray: '10, 10'
+            }).addTo(map);
+        }
+    }
+
+    function setValue(id, value) { document.getElementById(id).value = value; }
+
+    function loadScenario(type) {
+        if (type === "planned") {
+            setValue("event_type", "planned"); setValue("event_cause", "public_event"); setValue("priority", "High");
+            setValue("latitude", "12.9716"); setValue("longitude", "77.5946"); setValue("corridor", "CBD 1");
+            setValue("veh_type", "private_bus"); setValue("requires_road_closure", "yes"); setValue("police_station", "Cubbon Park");
+        }
+        if (type === "breakdown") {
+            setValue("event_type", "unplanned"); setValue("event_cause", "vehicle_breakdown"); setValue("priority", "High");
+            setValue("latitude", "12.9716"); setValue("longitude", "77.5946"); setValue("corridor", "Non-corridor");
+            setValue("veh_type", "lcv"); setValue("requires_road_closure", "no"); setValue("police_station", "Unknown");
+        }
+        if (type === "vip") {
+            setValue("event_type", "planned"); setValue("event_cause", "vip_movement"); setValue("priority", "Critical");
+            setValue("latitude", "12.9810"); setValue("longitude", "77.6090"); setValue("corridor", "Old Airport Road");
+            setValue("veh_type", "private_car"); setValue("requires_road_closure", "yes"); setValue("police_station", "High Grounds");
+        }
+    }
+</script>
+</body>
+</html>

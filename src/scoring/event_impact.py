@@ -19,10 +19,6 @@ def calculate_event_impact(
     event_cause = normalize_text(event_cause)
     veh_type = normalize_text(veh_type)
 
-    # =====================================================
-    # EVENT CAUSE WEIGHTS
-    # =====================================================
-
     cause_weights = {
         "vehicle_breakdown": 45,
         "accident": 85,
@@ -42,10 +38,6 @@ def calculate_event_impact(
         "test_demo": 20
     }
 
-    # =====================================================
-    # VEHICLE TYPE WEIGHTS
-    # =====================================================
-
     vehicle_weights = {
         "heavy_vehicle": 30,
         "truck": 30,
@@ -57,7 +49,8 @@ def calculate_event_impact(
         "taxi": 8,
         "auto": 6,
         "others": 10,
-        "unknown": 8
+        "unknown": 8,
+        "": 8
     }
 
     cause_score = cause_weights.get(
@@ -82,10 +75,6 @@ def calculate_event_impact(
         "private_bus"
     ]:
         public_transport_boost = 8
-
-    # =====================================================
-    # FINAL IMPACT SCORE
-    # =====================================================
 
     impact_score = (
         0.58 * cause_score

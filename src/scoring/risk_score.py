@@ -43,13 +43,6 @@ def calculate_final_operational_risk(
     forecast_risk_score,
     event_impact_score
 ):
-    """
-    Forecast risk = historical pattern.
-    Event impact = live operational severity.
-
-    For live traffic response, a high-impact event should be able
-    to escalate the final risk even if historical forecast is low.
-    """
 
     weighted_score = (
         0.45 * forecast_risk_score
@@ -66,7 +59,6 @@ def calculate_final_operational_risk(
         event_floor_score
     )
 
-    # Operational escalation rules
     if event_impact_score >= 85:
         final_score = max(
             final_score,
