@@ -65,7 +65,7 @@
 
     {% if feedback_status == "saved" %}
     <div class="alert success">
-        Post-event feedback saved successfully. This record is now available for future learning.
+        Post-event feedback saved successfully. This record has been stored for review and future retraining.
     </div>
     {% endif %}
 
@@ -777,7 +777,7 @@
                                 </strong>
 
                                 <strong>
-                                    +{{ result.baseline.risk_delta_points|floatformat:1 }} pp
+                                    +{{ result.baseline.risk_delta_points|floatformat:1 }}
                                 </strong>
                             </div>
 
@@ -785,7 +785,9 @@
                                 <span>Operational state</span>
                                 <strong>Baseline</strong>
                                 <strong>{{ result.final.final_level }}</strong>
-                                <strong>{{ result.action }}</strong>
+                                <strong style="line-height: 1.5; font-size: 12px; color: #cbd5e1;">
+                                    {{ result.action }}
+                                </strong>
                             </div>
                         </div>
 
@@ -896,92 +898,49 @@
                         </div>
                     </div>
 
-                    <div class="card fade-in" style="animation-delay: 0.4s;">
+                    <div class="card full fade-in">
                         <div class="card-kicker">
-                            Model Performance
+                            Historical Validation
                         </div>
 
-                        <h2>CatBoost Validation Metrics</h2>
+                        <h2>Operational Model Performance</h2>
 
-                        <div class="kv">
-                            <span>MAE</span>
-                            <strong class="mono">
-                                {% if result.metrics.mae is not None %}
-                                    {{ result.metrics.mae|floatformat:4 }}
-                                {% else %}
-                                    Not available
-                                {% endif %}
-                            </strong>
+                        <p class="model-headline">
+                            {{ result.operational_metrics.headline }}
+                        </p>
+
+                        <div class="ops-metric-grid">
+                            {% for card in result.operational_metrics.summary_cards %}
+                                <div class="ops-metric-card">
+                                    <span>{{ card.title }}</span>
+                                    <strong>{{ card.value }}</strong>
+                                    <p>{{ card.description }}</p>
+                                </div>
+                            {% endfor %}
                         </div>
 
-                        <div class="kv">
-                            <span>R² Score</span>
-                            <strong class="mono">
-                                {% if result.metrics.r2 is not None %}
-                                    {{ result.metrics.r2|floatformat:4 }}
-                                {% else %}
-                                    Not available
-                                {% endif %}
-                            </strong>
+                        <div class="terminal-header">
+                            Metric translation
                         </div>
 
-                        <div class="kv">
-                            <span>Alert Accuracy</span>
-                            <strong class="mono">
-                                {% if result.metrics.alert_accuracy is not None %}
-                                    {{ result.metrics.alert_accuracy|floatformat:4 }}
-                                {% else %}
-                                    Retrain required
-                                {% endif %}
-                            </strong>
-                        </div>
+                        <div class="metric-translation-table">
+                            <div class="metric-translation-row metric-translation-head">
+                                <span>Metric</span>
+                                <span>Raw Value</span>
+                                <span>Operational Meaning</span>
+                            </div>
 
-                        <div class="kv">
-                            <span>Alert Recall</span>
-                            <strong class="mono">
-                                {% if result.metrics.alert_recall is not None %}
-                                    {{ result.metrics.alert_recall|floatformat:4 }}
-                                {% else %}
-                                    Not available
-                                {% endif %}
-                            </strong>
-                        </div>
-
-                        <div class="kv">
-                            <span>Alert F1</span>
-                            <strong class="mono">
-                                {% if result.metrics.alert_f1 is not None %}
-                                    {{ result.metrics.alert_f1|floatformat:4 }}
-                                {% else %}
-                                    Not available
-                                {% endif %}
-                            </strong>
-                        </div>
-
-                        <div class="kv">
-                            <span>ROC-AUC</span>
-                            <strong class="mono">
-                                {% if result.metrics.roc_auc is not None %}
-                                    {{ result.metrics.roc_auc|floatformat:4 }}
-                                {% else %}
-                                    Not available
-                                {% endif %}
-                            </strong>
-                        </div>
-
-                        <div class="kv">
-                            <span>PR-AUC</span>
-                            <strong class="mono">
-                                {% if result.metrics.pr_auc is not None %}
-                                    {{ result.metrics.pr_auc|floatformat:4 }}
-                                {% else %}
-                                    Not available
-                                {% endif %}
-                            </strong>
+                            {% for row in result.operational_metrics.explanation_rows %}
+                                <div class="metric-translation-row">
+                                    <strong>{{ row.metric }}</strong>
+                                    <strong class="mono">{{ row.raw_value }}</strong>
+                                    <span>{{ row.operational_meaning }}</span>
+                                </div>
+                            {% endfor %}
                         </div>
 
                         <p class="muted terminal-text">
-                            &gt; Hurdle model: CatBoost classifier predicts incident likelihood, CatBoost regressor estimates positive incident count.
+                            &gt; The alert classifier is the main decision layer. Exact incident-count regression is secondary because the data is sparse and zero-heavy.
                         </p>
                     </div>
 
@@ -1096,13 +1055,13 @@
 
                     <div class="card full fade-in">
                         <div class="card-kicker">
-                            Post-event Learning
+                            Feedback Collection
                         </div>
 
-                        <h2>Officer Feedback Loop</h2>
+                        <h2>Post-event Feedback Capture</h2>
 
                         <p class="muted">
-                            After the event is completed, enter what actually happened. This creates a feedback record for future model improvement.
+                            After the event is completed, officers can record what actually happened. These records are stored for audit, analysis, and future retraining. The model is not automatically retrained yet.
                         </p>
 
                         <form

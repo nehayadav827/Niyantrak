@@ -1573,3 +1573,112 @@ h2::before {
         align-items: flex-start;
     }
 }
+
+/* ============================================================
+   OPERATIONAL METRICS TRANSLATION
+============================================================ */
+
+.model-headline {
+    margin: 12px 0 18px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    color: #dbeafe;
+    background: rgba(14, 165, 233, 0.10);
+    border: 1px solid rgba(14, 165, 233, 0.22);
+    font-weight: 800;
+    line-height: 1.7;
+}
+
+.ops-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin: 18px 0;
+}
+
+.ops-metric-card {
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.ops-metric-card span {
+    display: block;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ops-metric-card strong {
+    display: block;
+    margin-top: 8px;
+    color: #67e8f9;
+    font-size: 28px;
+    font-family: var(--font-mono);
+}
+
+.ops-metric-card p {
+    margin: 10px 0 0;
+    color: #cbd5e1;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.metric-translation-table {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.metric-translation-row {
+    display: grid;
+    grid-template-columns: 0.8fr 0.7fr 2.2fr;
+    gap: 14px;
+    align-items: center;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(2, 6, 23, 0.42);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.metric-translation-row span {
+    color: #cbd5e1;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.metric-translation-row strong {
+    color: #ffffff;
+    font-size: 13px;
+}
+
+.metric-translation-head {
+    background: rgba(6, 182, 212, 0.10);
+    border-color: rgba(6, 182, 212, 0.22);
+}
+
+.metric-translation-head span {
+    color: #67e8f9;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+@media (max-width: 1000px) {
+    .ops-metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .metric-translation-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .ops-metric-grid {
+        grid-template-columns: 1fr;
+    }
+}

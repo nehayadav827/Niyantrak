@@ -679,6 +679,145 @@ def build_deployment_order(
     )
 
 
+def metric_available(value):
+    try:
+        if value is None:
+            return False
+
+        value = float(value)
+
+        return not np.isnan(value)
+
+    except Exception:
+        return False
+
+
+def percent_text(value):
+    if not metric_available(value):
+        return "Not available"
+
+    return f"{float(value) * 100:.1f}%"
+
+
+def number_text(value, digits=3):
+    if not metric_available(value):
+        return "Not available"
+
+    return f"{float(value):.{digits}f}"
+
+
+def build_operational_metrics(model_metrics):
+    mae = model_metrics.get("mae")
+    rmse = model_metrics.get("rmse")
+    r2 = model_metrics.get("r2")
+
+    alert_accuracy = model_metrics.get("alert_accuracy")
+    alert_precision = model_metrics.get("alert_precision")
+    alert_recall = model_metrics.get("alert_recall")
+    alert_f1 = model_metrics.get("alert_f1")
+    roc_auc = model_metrics.get("roc_auc")
+    pr_auc = model_metrics.get("pr_auc")
+
+    summary_cards = [
+        {
+            "title": "Incident Capture",
+            "value": percent_text(alert_recall),
+            "description": (
+                "Caught this share of real incident-hours during historical validation."
+            ),
+        },
+        {
+            "title": "Risk Ranking Quality",
+            "value": number_text(roc_auc, 3),
+            "description": (
+                "ROC-AUC shows how well the model ranks risky hours above normal hours."
+            ),
+        },
+        {
+            "title": "Average Count Error",
+            "value": number_text(mae, 3),
+            "description": (
+                "Average incident-count error per corridor-hour."
+            ),
+        },
+        {
+            "title": "Alert Correctness",
+            "value": percent_text(alert_accuracy),
+            "description": (
+                "Share of historical hours where the alert/no-alert decision was correct."
+            ),
+        },
+    ]
+
+    explanation_rows = [
+        {
+            "metric": "Recall",
+            "raw_value": number_text(alert_recall, 4),
+            "operational_meaning": (
+                f"The model caught {percent_text(alert_recall)} of real incident-hours."
+            ),
+        },
+        {
+            "metric": "Precision",
+            "raw_value": number_text(alert_precision, 4),
+            "operational_meaning": (
+                f"When the system raised an alert, {percent_text(alert_precision)} were true incident-hours."
+            ),
+        },
+        {
+            "metric": "ROC-AUC",
+            "raw_value": number_text(roc_auc, 4),
+            "operational_meaning": (
+                "Measures whether risky hours are ranked above quiet hours. "
+                "This is more important than R² for alerting."
+            ),
+        },
+        {
+            "metric": "PR-AUC",
+            "raw_value": number_text(pr_auc, 4),
+            "operational_meaning": (
+                "Measures alert quality when incident-hours are rare."
+            ),
+        },
+        {
+            "metric": "MAE",
+            "raw_value": number_text(mae, 4),
+            "operational_meaning": (
+                "Average count error in predicted incidents per corridor-hour."
+            ),
+        },
+        {
+            "metric": "R²",
+            "raw_value": number_text(r2, 4),
+            "operational_meaning": (
+                "Regression fit for exact incident count. It is secondary because the dataset is zero-heavy and spike-driven."
+            ),
+        },
+    ]
+
+    headline = (
+        f"Caught {percent_text(alert_recall)} of real incident-hours in historical validation. "
+        f"Risk ranking quality was ROC-AUC {number_text(roc_auc, 3)}."
+    )
+
+    return {
+        "headline": headline,
+        "summary_cards": summary_cards,
+        "explanation_rows": explanation_rows,
+        "raw": {
+            "mae": mae,
+            "rmse": rmse,
+            "r2": r2,
+            "alert_accuracy": alert_accuracy,
+            "alert_precision": alert_precision,
+            "alert_recall": alert_recall,
+            "alert_f1": alert_f1,
+            "roc_auc": roc_auc,
+            "pr_auc": pr_auc,
+        },
+    }
+
+
 def predict_event_impact(payload):
     model = load_model()
     store = load_feature_store()
@@ -984,6 +1123,10 @@ def predict_event_impact(payload):
         "pr_auc": holdout_metrics.get("pr_auc"),
     }
 
+    operational_metrics = build_operational_metrics(
+        model_metrics
+    )
+
     prediction_interval = build_prediction_interval(
         predicted_incidents=predicted_incidents,
         model_metrics=model_metrics,
@@ -1126,6 +1269,8 @@ def predict_event_impact(payload):
         "diversion": diversion,
 
         "metrics": model_metrics,
+
+        "operational_metrics": operational_metrics,
 
         "map": {
             "latitude": latitude,
