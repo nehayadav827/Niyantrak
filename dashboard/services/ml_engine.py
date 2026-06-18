@@ -12,6 +12,8 @@ from src.forecasting.forecast_predictor import (
     predict_single_forecast
 )
 
+from src.inference.similar_events import find_similar_events
+
 from src.inference.location_resolver import (
     resolve_corridor_from_coordinates,
     get_profile_with_spatial_fallback
@@ -247,53 +249,44 @@ def get_risk_level_from_score(
     return "CRITICAL"
 
 
-def apply_crowd_weather_adjustment(
-    event_score,
-    crowd_size,
-    weather
-):
-    crowd = str(
-        crowd_size or "small"
-    ).strip().lower()
+def get_crowd_multiplier(crowd_size):
+    crowd_size = (
+        str(crowd_size or "small")
+        .strip()
+        .lower()
+    )
 
-    weather = str(
-        weather or "clear"
-    ).strip().lower()
-
-    crowd_multiplier = {
+    crowd_multipliers = {
         "small": 1.00,
         "medium": 1.08,
         "large": 1.18,
         "mega": 1.30,
-    }.get(
-        crowd,
+    }
+
+    return crowd_multipliers.get(
+        crowd_size,
         1.00
     )
 
-    weather_multiplier = {
+
+def get_weather_multiplier(weather):
+    weather = (
+        str(weather or "clear")
+        .strip()
+        .lower()
+    )
+
+    weather_multipliers = {
         "clear": 1.00,
         "light_rain": 1.10,
         "heavy_rain": 1.25,
         "fog": 1.20,
-    }.get(
+    }
+
+    return weather_multipliers.get(
         weather,
         1.00
     )
-
-    adjusted = (
-        event_score
-        *
-        crowd_multiplier
-        *
-        weather_multiplier
-    )
-
-    adjusted = max(
-        0,
-        min(adjusted, 100)
-    )
-
-    return adjusted, crowd_multiplier, weather_multiplier
 
 
 def calculate_eis_score(
@@ -524,6 +517,104 @@ def build_shift_plan(
     ]
 
 
+def build_prediction_interval(
+    predicted_incidents,
+    model_metrics,
+    alert_probability=None
+):
+    """
+    Demo-safe uncertainty band using holdout RMSE.
+
+    This is not a true quantile CatBoost interval.
+    It is a residual-based confidence range from validation error.
+    """
+
+    rmse = safe_float(
+        model_metrics.get("rmse"),
+        0.50
+    )
+
+    if rmse <= 0:
+        rmse = 0.50
+
+    uncertainty_width = 1.64 * rmse
+
+    if alert_probability is not None:
+        # Wider interval around uncertain alert probability.
+        probability_uncertainty = 1 - abs(
+            float(alert_probability) - 0.5
+        ) * 2
+
+        uncertainty_width *= (
+            1 + 0.35 * probability_uncertainty
+        )
+
+    lower = max(
+        0.0,
+        predicted_incidents - uncertainty_width
+    )
+
+    upper = max(
+        predicted_incidents,
+        predicted_incidents + uncertainty_width
+    )
+
+    return {
+        "expected": float(predicted_incidents),
+        "lower": float(lower),
+        "upper": float(upper),
+        "method": "Holdout RMSE residual range",
+    }
+
+
+def build_deployment_order(
+    latitude,
+    longitude,
+    corridor,
+    event_cause,
+    final_level,
+    final_score,
+    officers,
+    barricades,
+    diversion,
+    duration,
+    action
+):
+    support_corridors = diversion.get(
+        "support_corridors",
+        []
+    )
+
+    support_text = (
+        ", ".join(support_corridors)
+        if support_corridors
+        else "None"
+    )
+
+    return (
+        "TRAFFIC DEPLOYMENT ORDER\n"
+        "----------------------------------------\n"
+        f"Risk Level       : {final_level}\n"
+        f"Risk Score       : {final_score:.2f}%\n"
+        f"Event Cause      : {event_cause}\n"
+        f"Location         : {latitude:.6f}, {longitude:.6f}\n"
+        f"Inferred Corridor: {corridor}\n"
+        f"Duration Estimate: {duration} minutes\n\n"
+        "RESOURCE PLAN\n"
+        "----------------------------------------\n"
+        f"Officers Required: {officers}\n"
+        f"Barricades Needed: {barricades}\n\n"
+        "DIVERSION PLAN\n"
+        "----------------------------------------\n"
+        f"Primary Detour   : {diversion.get('primary_detour')}\n"
+        f"Secondary Detour : {diversion.get('secondary_detour')}\n"
+        f"Support Corridors: {support_text}\n\n"
+        "ACTION\n"
+        "----------------------------------------\n"
+        f"{action}"
+    )
+
+
 def predict_event_impact(
     payload
 ):
@@ -548,6 +639,22 @@ def predict_event_impact(
         77.5946
     )
 
+    location_match = resolve_corridor_from_coordinates(
+        latitude=latitude,
+        longitude=longitude,
+        store=store
+    )
+
+    if location_match.get("outside_bengaluru"):
+        raise ValueError(
+            "Selected location is outside Bengaluru coverage area. Please choose a location inside Bengaluru."
+        )
+
+    corridor = resolve_corridor_name(
+        location_match["corridor"],
+        store
+    )
+
     end_latitude = safe_float(
         payload.get("end_latitude"),
         None
@@ -556,17 +663,6 @@ def predict_event_impact(
     end_longitude = safe_float(
         payload.get("end_longitude"),
         None
-    )
-
-    location_match = resolve_corridor_from_coordinates(
-        latitude=latitude,
-        longitude=longitude,
-        store=store
-    )
-
-    corridor = resolve_corridor_name(
-        location_match["corridor"],
-        store
     )
 
     event_type = payload.get(
@@ -718,10 +814,25 @@ def predict_event_impact(
         100
     )
 
-    event_score, crowd_multiplier, weather_multiplier = apply_crowd_weather_adjustment(
-        event_score=event_score,
-        crowd_size=crowd_size,
-        weather=weather
+    crowd_multiplier = get_crowd_multiplier(
+        crowd_size
+    )
+
+    weather_multiplier = get_weather_multiplier(
+        weather
+    )
+
+    event_score = (
+        event_score
+        *
+        crowd_multiplier
+        *
+        weather_multiplier
+    )
+
+    event_score = max(
+        0,
+        min(event_score, 100)
     )
 
     event_level = get_risk_level_from_score(
@@ -798,29 +909,44 @@ def predict_event_impact(
 
     if normal_baseline <= 0:
         normal_baseline = safe_float(
+            profile.get("rolling_6"),
+            0.0
+        )
+
+    if normal_baseline <= 0:
+        normal_baseline = safe_float(
             profile.get("corridor_avg"),
             0.0
         )
 
-    expected_delta = max(
-        predicted_incidents - normal_baseline,
+    expected_after_event = max(
+        predicted_incidents,
         0.0
+    )
+
+    expected_delta = max(
+        expected_after_event - normal_baseline,
+        0.0
+    )
+
+    if normal_baseline > 0:
+        percentage_increase = (
+                                      expected_delta
+                                      /
+                                      normal_baseline
+                              ) * 100
+    else:
+        percentage_increase = 100 if expected_after_event > 0 else 0
+
+    percentage_increase = max(
+        0,
+        min(percentage_increase, 999)
     )
 
     shift_plan = build_shift_plan(
         timestamp=timestamp,
         duration_minutes=duration,
         officers=officers
-    )
-
-    deployment_order = (
-        f"Traffic deployment order: {final_level} risk event at "
-        f"lat {latitude:.6f}, lon {longitude:.6f}. "
-        f"Inferred corridor: {corridor}. "
-        f"Deploy {officers} officers and {barricades} barricades. "
-        f"Primary detour: {diversion.get('primary_detour')}. "
-        f"Secondary detour: {diversion.get('secondary_detour')}. "
-        f"Action: {action}"
     )
 
     holdout_metrics = {}
@@ -831,12 +957,57 @@ def predict_event_impact(
             {}
         )
 
+    model_metrics = {
+        "mae": holdout_metrics.get("mae"),
+        "rmse": holdout_metrics.get("rmse"),
+        "r2": holdout_metrics.get("r2"),
+
+        "alert_accuracy": holdout_metrics.get("alert_accuracy"),
+        "alert_precision": holdout_metrics.get("alert_precision"),
+        "alert_recall": holdout_metrics.get("alert_recall"),
+        "alert_f1": holdout_metrics.get("alert_f1"),
+        "roc_auc": holdout_metrics.get("roc_auc"),
+        "pr_auc": holdout_metrics.get("pr_auc"),
+    }
+
+    prediction_interval = build_prediction_interval(
+        predicted_incidents=predicted_incidents,
+        model_metrics=model_metrics,
+        alert_probability=alert_probability
+    )
+
+    similar_events = find_similar_events(
+        event_cause=event_cause,
+        corridor=corridor,
+        latitude=latitude,
+        longitude=longitude,
+        hour=hour,
+        limit=3
+    )
+
+    deployment_order = build_deployment_order(
+        latitude=latitude,
+        longitude=longitude,
+        corridor=corridor,
+        event_cause=event_cause,
+        final_level=final_level,
+        final_score=final_score,
+        officers=officers,
+        barricades=barricades,
+        diversion=diversion,
+        duration=duration,
+        action=action
+    )
+
     return {
         "input": {
             "event_type": event_type,
             "event_cause": event_cause,
             "priority": priority,
             "corridor": corridor,
+            "latitude": latitude,
+            "longitude": longitude,
+            "location_match": location_match,
             "veh_type": veh_type,
             "police_station": police_station,
             "timestamp": timestamp,
@@ -844,13 +1015,10 @@ def predict_event_impact(
             "weekday": weekday,
             "month": month,
             "road_closure": road_closure,
-            "latitude": latitude,
-            "longitude": longitude,
             "end_latitude": end_latitude,
             "end_longitude": end_longitude,
             "crowd_size": crowd_size,
             "weather": weather,
-            "location_match": location_match,
         },
 
         "forecast": {
@@ -874,6 +1042,16 @@ def predict_event_impact(
             "cause_risk_score": cause_risk_score,
         },
 
+        "baseline": {
+            "normal_baseline": normal_baseline,
+            "predicted_after_event": expected_after_event,
+            "expected_delta": expected_delta,
+            "percentage_increase": percentage_increase,
+
+            "baseline_source": profile_source,
+            "baseline_reference": "rolling_24 → rolling_6 → corridor_avg",
+        },
+
         "final": {
             "final_score": final_score,
             "final_level": final_level,
@@ -883,11 +1061,9 @@ def predict_event_impact(
             "secondary_radius_m": secondary_radius,
         },
 
-        "baseline": {
-            "normal_baseline": normal_baseline,
-            "predicted_after_event": predicted_incidents,
-            "expected_delta": expected_delta,
-        },
+        "confidence": prediction_interval,
+
+        "similar_events": similar_events,
 
         "history": {
             "profile_source": profile_source,
@@ -914,7 +1090,7 @@ def predict_event_impact(
 
         "diversion": diversion,
 
-        "metrics": holdout_metrics,
+        "metrics": model_metrics,
 
         "map": {
             "latitude": latitude,

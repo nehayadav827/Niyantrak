@@ -314,6 +314,13 @@ h1 {
     color: #ffffff;
 }
 
+.readonly-input {
+    color: #67e8f9 !important;
+    border-color: rgba(103, 232, 249, 0.35) !important;
+    background: rgba(6, 182, 212, 0.08) !important;
+    cursor: not-allowed;
+}
+
 /* Primary Button */
 
 .primary-btn {
@@ -433,6 +440,13 @@ h1 {
     z-index: 1;
     overflow: hidden;
     background: #dbeafe;
+}
+
+.map-click-hint {
+    margin-top: 10px;
+    color: #94a3b8;
+    font-size: 13px;
+    font-family: var(--font-mono);
 }
 
 /*
@@ -880,6 +894,50 @@ h2::before {
 }
 
 /* ============================================================
+   COMPARISON TABLE
+============================================================ */
+
+.comparison-table {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.comparison-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.comparison-row span {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.comparison-row strong {
+    color: #ffffff;
+    font-family: var(--font-mono);
+    font-size: 14px;
+}
+
+.comparison-head {
+    background: rgba(6, 182, 212, 0.10);
+    border-color: rgba(6, 182, 212, 0.22);
+}
+
+.comparison-head span {
+    color: var(--cyan-soft);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ============================================================
    LOADING + ERROR + ANIMATION
 ============================================================ */
 
@@ -967,6 +1025,102 @@ h2::before {
 }
 
 /* ============================================================
+   IMPACT MAP MARKERS + CIRCLES
+============================================================ */
+
+.event-marker {
+    background: transparent;
+    border: none;
+}
+
+.pulse-marker {
+    position: relative;
+    width: 32px;
+    height: 32px;
+}
+
+.pulse-marker::before,
+.pulse-marker::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.28);
+    animation: markerPulse 1.8s infinite ease-out;
+}
+
+.pulse-marker::after {
+    animation-delay: 0.8s;
+}
+
+.pulse-core {
+    position: absolute;
+    top: 9px;
+    left: 9px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 2px solid #ffffff;
+    box-shadow:
+        0 0 18px rgba(239, 68, 68, 0.85),
+        0 0 36px rgba(239, 68, 68, 0.45);
+    z-index: 2;
+}
+
+@keyframes markerPulse {
+    0% {
+        transform: scale(0.35);
+        opacity: 0.85;
+    }
+
+    100% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+}
+
+.map-popup {
+    font-family: "Inter", sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #0f172a;
+}
+
+.map-legend {
+    background: rgba(15, 23, 42, 0.94);
+    color: #f8fafc;
+    padding: 13px 15px;
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+    font-size: 13px;
+    min-width: 220px;
+    backdrop-filter: blur(14px);
+}
+
+.map-legend h4 {
+    margin: 0 0 8px 0;
+    font-size: 15px;
+    color: #ffffff;
+}
+
+.map-legend span {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border-radius: 999px;
+    margin-right: 7px;
+    vertical-align: middle;
+}
+
+.map-legend hr {
+    border: none;
+    border-top: 1px solid rgba(148, 163, 184, 0.24);
+    margin: 8px 0;
+}
+
+/* ============================================================
    RESPONSIVE
 ============================================================ */
 
@@ -994,6 +1148,12 @@ h2::before {
 
     #map {
         height: 440px;
+    }
+}
+
+@media (max-width: 760px) {
+    .comparison-row {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1029,5 +1189,101 @@ h2::before {
     .map-mini-stats {
         flex-direction: column;
         gap: 4px;
+    }
+}
+
+/* ============================================================
+   JUDGE DEMO EXTENSIONS
+============================================================ */
+
+.alert.success {
+    margin: 18px 0;
+    padding: 14px 18px;
+    border-radius: 16px;
+    color: #bbf7d0;
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    font-weight: 700;
+}
+
+.similar-events {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.similar-event-card {
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.similar-event-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.similar-event-top strong {
+    color: #ffffff;
+    text-transform: capitalize;
+}
+
+.similar-event-top span {
+    color: #67e8f9;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.deployment-order-box {
+    width: 100%;
+    min-height: 260px;
+    margin-top: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(103, 232, 249, 0.22);
+    color: #dbeafe;
+    background: rgba(2, 6, 23, 0.72);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.7;
+    resize: vertical;
+}
+
+.feedback-form {
+    margin-top: 18px;
+}
+
+.feedback-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.secondary-btn {
+    margin-top: 14px;
+    padding: 12px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(103, 232, 249, 0.3);
+    color: #e0f2fe;
+    background: rgba(14, 165, 233, 0.12);
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.secondary-btn:hover {
+    background: rgba(14, 165, 233, 0.22);
+}
+
+@media (max-width: 900px) {
+    .similar-events {
+        grid-template-columns: 1fr;
+    }
+
+    .feedback-grid {
+        grid-template-columns: 1fr;
     }
 }
