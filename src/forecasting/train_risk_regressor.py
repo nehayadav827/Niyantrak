@@ -17,12 +17,15 @@ def train_risk_regressor(risk_df):
 
     print("\nPreparing Risk Forecast Features...")
 
-    FEATURES = [
+    features = [
         "corridor",
 
         "hour",
         "weekday",
         "month",
+        "is_event_day",
+        "calendar_event_type",
+        "calendar_event_intensity",
 
         "hour_sin",
         "hour_cos",

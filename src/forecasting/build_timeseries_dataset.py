@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
-
+from src.features.event_calender import (
+    add_event_calendar_features_to_corridor_timeseries,
+)
 
 FEATURES = [
     "corridor",
@@ -8,6 +10,9 @@ FEATURES = [
     "hour",
     "weekday",
     "month",
+    "is_event_day",
+    "calendar_event_type",
+    "calendar_event_intensity",
 
     "hour_sin",
     "hour_cos",
@@ -622,7 +627,10 @@ def build_timeseries_dataset(df):
 
     for col in FEATURES:
         if col not in ts_df.columns:
-            ts_df[col] = 0
+            if col == "calendar_event_type":
+                ts_df[col] = "none"
+            else:
+                ts_df[col] = 0
 
     ts_df = ts_df[
         [

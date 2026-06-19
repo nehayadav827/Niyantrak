@@ -1,4 +1,5 @@
 import os
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -15,12 +16,12 @@ from sklearn.metrics import (
     f1_score,
     accuracy_score,
     roc_auc_score,
-    average_precision_score
+    average_precision_score,
 )
 
 from src.forecasting.forecast_predictor import (
     predict_forecast_count,
-    HurdleModelBundle
+    HurdleModelBundle,
 )
 
 
@@ -30,6 +31,10 @@ FEATURES = [
     "hour",
     "weekday",
     "month",
+
+    "is_event_day",
+    "calendar_event_type",
+    "calendar_event_intensity",
 
     "hour_sin",
     "hour_cos",
@@ -63,17 +68,15 @@ FEATURES = [
 
 
 CAT_FEATURES = [
-    "corridor"
+    "corridor",
+    "calendar_event_type",
 ]
 
 
 TARGET = "incident_count"
 
 
-
-
 def validate_dataset(ts_df):
-
     missing = [
         col
         for col in FEATURES + [TARGET, "time_bucket"]
@@ -81,17 +84,72 @@ def validate_dataset(ts_df):
     ]
 
     if missing:
-
         raise ValueError(
             "Missing required columns for forecasting:\n"
             + str(missing)
         )
 
 
+def prepare_feature_frame(df):
+    X = df[FEATURES].copy()
+
+    categorical_cols = [
+        col
+        for col in CAT_FEATURES
+        if col in X.columns
+    ]
+
+    for col in categorical_cols:
+        X[col] = (
+            X[col]
+            .fillna("none")
+            .astype(str)
+        )
+
+    for col in X.columns:
+        if col in categorical_cols:
+            continue
+
+        X[col] = pd.to_numeric(
+            X[col],
+            errors="coerce"
+        )
+
+        median_value = X[col].median()
+
+        if pd.isna(median_value):
+            median_value = 0.0
+
+        X[col] = X[col].fillna(
+            median_value
+        )
+
+    return X
+
+
 def split_by_time(
     df,
     train_ratio=0.8
 ):
+    df = df.copy()
+
+    df["time_bucket"] = pd.to_datetime(
+        df["time_bucket"],
+        errors="coerce",
+        utc=True
+    ).dt.tz_convert(None)
+
+    df = (
+        df
+        .dropna(subset=["time_bucket"])
+        .sort_values(
+            [
+                "time_bucket",
+                "corridor"
+            ]
+        )
+        .reset_index(drop=True)
+    )
 
     unique_times = sorted(
         df["time_bucket"].unique()
@@ -116,11 +174,11 @@ def split_by_time(
 
     return train_df, test_df
 
+
 def tune_alert_threshold(
     y_true_alert,
     alert_proba
 ):
-
     best_threshold = 0.50
     best_score = -1
 
@@ -133,7 +191,6 @@ def tune_alert_threshold(
     beta = 2.0
 
     for threshold in thresholds:
-
         preds = (
             alert_proba >= threshold
         ).astype(int)
@@ -151,7 +208,7 @@ def tune_alert_threshold(
         )
 
         if precision == 0 and recall == 0:
-            score = 0
+            score = 0.0
 
         else:
             score = (
@@ -169,7 +226,6 @@ def tune_alert_threshold(
             )
 
         if score > best_score:
-
             best_score = score
             best_threshold = threshold
 
@@ -181,6 +237,38 @@ def fit_hurdle_bundle(
     y_train,
     alert_threshold=0.35
 ):
+    X_train = X_train.copy()
+
+    categorical_cols = [
+        col
+        for col in CAT_FEATURES
+        if col in X_train.columns
+    ]
+
+    for col in categorical_cols:
+        X_train[col] = (
+            X_train[col]
+            .fillna("none")
+            .astype(str)
+        )
+
+    for col in X_train.columns:
+        if col in categorical_cols:
+            continue
+
+        X_train[col] = pd.to_numeric(
+            X_train[col],
+            errors="coerce"
+        )
+
+        median_value = X_train[col].median()
+
+        if pd.isna(median_value):
+            median_value = 0.0
+
+        X_train[col] = X_train[col].fillna(
+            median_value
+        )
 
     y_train = y_train.astype(float)
 
@@ -196,13 +284,13 @@ def fit_hurdle_bundle(
         eval_metric="AUC",
         auto_class_weights="Balanced",
         random_seed=42,
-        verbose=False
+        verbose=False,
     )
 
     classifier.fit(
         X_train,
         y_alert,
-        cat_features=CAT_FEATURES
+        cat_features=categorical_cols
     )
 
     positive_mask = (
@@ -210,14 +298,12 @@ def fit_hurdle_bundle(
     )
 
     positive_count_mean = 1.0
-
     regressor = None
 
     if positive_mask.sum() >= 20:
-
         X_pos = X_train.loc[
             positive_mask
-        ]
+        ].copy()
 
         y_pos = y_train.loc[
             positive_mask
@@ -237,19 +323,17 @@ def fit_hurdle_bundle(
             learning_rate=0.03,
             loss_function="RMSE",
             random_seed=42,
-            verbose=False
+            verbose=False,
         )
 
         regressor.fit(
             X_pos,
             y_pos_log,
-            cat_features=CAT_FEATURES
+            cat_features=categorical_cols
         )
 
     else:
-
         if positive_mask.sum() > 0:
-
             positive_count_mean = float(
                 y_train.loc[positive_mask].mean()
             )
@@ -261,7 +345,8 @@ def fit_hurdle_bundle(
         "regressor": regressor,
 
         "features": FEATURES,
-        "cat_features": CAT_FEATURES,
+        "cat_features": categorical_cols,
+        "categorical_cols": categorical_cols,
 
         "alert_threshold": float(alert_threshold),
         "positive_count_mean": float(positive_count_mean),
@@ -273,9 +358,7 @@ def fit_hurdle_bundle(
 def build_calibrated_threshold(
     train_df
 ):
-
     if len(train_df) < 100:
-
         return 0.35
 
     calibration_train_df, calibration_df = split_by_time(
@@ -284,14 +367,23 @@ def build_calibrated_threshold(
     )
 
     if len(calibration_train_df) == 0 or len(calibration_df) == 0:
-
         return 0.35
 
-    X_cal_train = calibration_train_df[FEATURES]
-    y_cal_train = calibration_train_df[TARGET]
+    X_cal_train = prepare_feature_frame(
+        calibration_train_df
+    )
 
-    X_cal = calibration_df[FEATURES]
-    y_cal = calibration_df[TARGET]
+    y_cal_train = calibration_train_df[
+        TARGET
+    ].astype(float)
+
+    X_cal = prepare_feature_frame(
+        calibration_df
+    )
+
+    y_cal = calibration_df[
+        TARGET
+    ].astype(float)
 
     temp_bundle = fit_hurdle_bundle(
         X_train=X_cal_train,
@@ -308,14 +400,14 @@ def build_calibrated_threshold(
         y_cal > 0
     ).astype(int)
 
-    threshold, best_f1 = tune_alert_threshold(
+    threshold, best_f2 = tune_alert_threshold(
         y_true_alert=y_cal_alert,
         alert_proba=pred["alert_probability"]
     )
 
     print("\nCalibrated Alert Threshold:")
     print(f"Threshold : {threshold:.2f}")
-    print(f"Calib F2  : {best_f1:.4f}")
+    print(f"Calib F2  : {best_f2:.4f}")
 
     return threshold
 
@@ -325,6 +417,29 @@ def evaluate_hurdle_model(
     X_test,
     y_test
 ):
+    X_test = X_test.copy()
+
+    cat_cols = bundle.get(
+        "cat_features",
+        []
+    )
+
+    for col in cat_cols:
+        if col in X_test.columns:
+            X_test[col] = (
+                X_test[col]
+                .fillna("none")
+                .astype(str)
+            )
+
+    for col in X_test.columns:
+        if col in cat_cols:
+            continue
+
+        X_test[col] = pd.to_numeric(
+            X_test[col],
+            errors="coerce"
+        ).fillna(0.0)
 
     pred = predict_forecast_count(
         bundle,
@@ -359,10 +474,14 @@ def evaluate_hurdle_model(
         expected_count
     ) ** 0.5
 
-    r2 = r2_score(
-        y_test,
-        expected_count
-    )
+    try:
+        r2 = r2_score(
+            y_test,
+            expected_count
+        )
+
+    except Exception:
+        r2 = 0.0
 
     precision = precision_score(
         y_alert,
@@ -381,31 +500,28 @@ def evaluate_hurdle_model(
         alert_pred,
         zero_division=0
     )
+
     alert_accuracy = accuracy_score(
         y_alert,
         alert_pred
     )
 
     try:
-
         roc_auc = roc_auc_score(
             y_alert,
             alert_proba
         )
 
     except Exception:
-
         roc_auc = 0.0
 
     try:
-
         pr_auc = average_precision_score(
             y_alert,
             alert_proba
         )
 
     except Exception:
-
         pr_auc = 0.0
 
     metrics = {
@@ -424,10 +540,32 @@ def evaluate_hurdle_model(
     return metrics
 
 
+def save_bundle(
+    bundle
+):
+    os.makedirs(
+        "models",
+        exist_ok=True
+    )
+
+    joblib.dump(
+        bundle,
+        "models/timeseries_forecast_model.pkl"
+    )
+
+    joblib.dump(
+        bundle,
+        "models/timeseries_forecast.pkl"
+    )
+
+    print("\nModel Saved:")
+    print("models/timeseries_forecast_model.pkl")
+    print("models/timeseries_forecast.pkl")
+
+
 def train_timeseries_model(
     ts_df
 ):
-
     print("\n" + "=" * 60)
     print("TRAINING ZERO-INFLATED TRAFFIC FORECAST MODEL")
     print("=" * 60)
@@ -436,8 +574,17 @@ def train_timeseries_model(
         ts_df
     )
 
+    df = ts_df.copy()
+
+    df["time_bucket"] = pd.to_datetime(
+        df["time_bucket"],
+        errors="coerce",
+        utc=True
+    ).dt.tz_convert(None)
+
     df = (
-        ts_df
+        df
+        .dropna(subset=["time_bucket"])
         .sort_values(
             [
                 "time_bucket",
@@ -489,11 +636,21 @@ def train_timeseries_model(
         train_df
     )
 
-    X_train = train_df[FEATURES]
-    y_train = train_df[TARGET]
+    X_train = prepare_feature_frame(
+        train_df
+    )
 
-    X_test = test_df[FEATURES]
-    y_test = test_df[TARGET]
+    y_train = train_df[
+        TARGET
+    ].astype(float)
+
+    X_test = prepare_feature_frame(
+        test_df
+    )
+
+    y_test = test_df[
+        TARGET
+    ].astype(float)
 
     print("\nTraining holdout evaluation model...")
 
@@ -530,8 +687,13 @@ def train_timeseries_model(
 
     print("\nTraining production hurdle model on full dataset...")
 
-    X_full = df[FEATURES]
-    y_full = df[TARGET]
+    X_full = prepare_feature_frame(
+        df
+    )
+
+    y_full = df[
+        TARGET
+    ].astype(float)
 
     final_bundle = fit_hurdle_bundle(
         X_train=X_full,
@@ -540,24 +702,12 @@ def train_timeseries_model(
     )
 
     final_bundle["holdout_metrics"] = metrics
+    final_bundle["train_rows"] = int(len(df))
+    final_bundle["positive_rows"] = int((y_full > 0).sum())
+    final_bundle["zero_ratio"] = float((y_full == 0).mean())
 
-    os.makedirs(
-        "models",
-        exist_ok=True
+    save_bundle(
+        final_bundle
     )
-
-    joblib.dump(
-        final_bundle,
-        "models/timeseries_forecast_model.pkl"
-    )
-
-    joblib.dump(
-        final_bundle,
-        "models/timeseries_forecast.pkl"
-    )
-
-    print("\nModel Saved:")
-    print("models/timeseries_forecast_model.pkl")
-    print("models/timeseries_forecast.pkl")
 
     return final_bundle

@@ -58,12 +58,16 @@ def prepare_X_y(spatial_ts):
     categorical_cols = [
         "spatial_cluster_id",
         "dominant_corridor",
+        "calendar_event_type",
     ]
 
     for col in categorical_cols:
+        if col not in X.columns:
+            X[col] = "none"
+
         X[col] = (
             X[col]
-            .fillna("UNKNOWN")
+            .fillna("none")
             .astype(str)
         )
 

@@ -73,6 +73,9 @@ FEATURES = [
     "hour",
     "weekday",
     "month",
+    "is_event_day",
+    "calendar_event_type",
+    "calendar_event_intensity",
 
     "hour_sin",
     "hour_cos",
@@ -108,6 +111,106 @@ FEATURES = [
 _MODEL_CACHE = None
 _SPATIAL_MODEL_CACHE = None
 _STORE_CACHE = None
+
+
+def build_calendar_event_context_from_payload(payload):
+    event_type = (
+        str(payload.get("event_type", "unplanned"))
+        .strip()
+        .lower()
+    )
+
+    event_cause = (
+        str(payload.get("event_cause", "others"))
+        .strip()
+        .lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+
+    crowd_size = (
+        str(payload.get("crowd_size", "small"))
+        .strip()
+        .lower()
+    )
+
+    explicit_calendar_type = (
+        str(payload.get("calendar_event_type", ""))
+        .strip()
+        .lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+
+    planned_causes = {
+        "public_event": "public_event",
+        "protest": "protest",
+        "procession": "procession",
+        "vip_movement": "vip",
+        "festival": "festival",
+        "sports": "sports",
+        "political": "political",
+        "election": "election",
+    }
+
+    if explicit_calendar_type:
+        calendar_event_type = explicit_calendar_type
+
+    elif event_cause in planned_causes:
+        calendar_event_type = planned_causes[event_cause]
+
+    elif event_type == "planned":
+        calendar_event_type = "public_event"
+
+    else:
+        calendar_event_type = "none"
+
+    is_event_day = 1 if calendar_event_type != "none" else 0
+
+    intensity_map = {
+        "none": 0,
+        "sports": 75,
+        "festival": 70,
+        "public_event": 70,
+        "protest": 85,
+        "procession": 75,
+        "political": 85,
+        "vip": 90,
+        "election": 80,
+        "construction": 55,
+        "other": 45,
+    }
+
+    crowd_multiplier = {
+        "small": 0.60,
+        "medium": 0.80,
+        "large": 1.00,
+        "mega": 1.20,
+    }.get(
+        crowd_size,
+        0.60
+    )
+
+    calendar_event_intensity = (
+        intensity_map.get(
+            calendar_event_type,
+            45
+        )
+        *
+        crowd_multiplier
+    )
+
+    calendar_event_intensity = clamp(
+        calendar_event_intensity,
+        0,
+        100
+    )
+
+    return {
+        "is_event_day": is_event_day,
+        "calendar_event_type": calendar_event_type,
+        "calendar_event_intensity": calendar_event_intensity,
+    }
 
 
 def parse_bool(value):
@@ -287,12 +390,20 @@ def normalize_timestamp(timestamp_string):
 
 
 def build_input_row(
-    corridor,
-    hour,
-    weekday,
-    month,
-    profile
+        corridor,
+        hour,
+        weekday,
+        month,
+        profile,
+        calendar_context=None
 ):
+    if calendar_context is None:
+        calendar_context = {
+            "is_event_day": 0,
+            "calendar_event_type": "none",
+            "calendar_event_intensity": 0.0,
+        }
+
     hour_sin = np.sin(
         2 * np.pi * hour / 24
     )
@@ -315,6 +426,22 @@ def build_input_row(
 
         elif feature == "month":
             row[feature] = month
+
+        elif feature == "is_event_day":
+            row[feature] = int(
+                calendar_context.get("is_event_day", 0)
+            )
+
+        elif feature == "calendar_event_type":
+            row[feature] = str(
+                calendar_context.get("calendar_event_type", "none")
+            )
+
+        elif feature == "calendar_event_intensity":
+            row[feature] = safe_float(
+                calendar_context.get("calendar_event_intensity"),
+                0.0
+            )
 
         elif feature == "hour_sin":
             row[feature] = hour_sin
@@ -342,8 +469,16 @@ def build_spatial_input_row(
     weekday,
     month,
     profile,
-    location_match
+    location_match,
+    calendar_context=None
 ):
+    if calendar_context is None:
+        calendar_context = {
+            "is_event_day": 0,
+            "calendar_event_type": "none",
+            "calendar_event_intensity": 0.0,
+        }
+
     cluster_id = location_match.get(
         "spatial_cluster_id"
     )
@@ -385,6 +520,10 @@ def build_spatial_input_row(
         "hour": hour,
         "weekday": weekday,
         "month": month,
+
+        "is_event_day": int(calendar_context.get("is_event_day", 0)),
+        "calendar_event_type": str(calendar_context.get("calendar_event_type", "none")),
+        "calendar_event_intensity": safe_float(calendar_context.get("calendar_event_intensity"), 0.0),
 
         "hour_sin": hour_sin,
         "hour_cos": hour_cos,
@@ -430,6 +569,10 @@ def build_spatial_input_row(
         "hour",
         "weekday",
         "month",
+
+        "is_event_day",
+        "calendar_event_type",
+        "calendar_event_intensity",
 
         "hour_sin",
         "hour_cos",
@@ -1466,6 +1609,10 @@ def predict_event_impact(payload):
     weekday = timestamp.weekday()
     month = timestamp.month
 
+    calendar_context = build_calendar_event_context_from_payload(
+        payload
+    )
+
     latitude = safe_float(
         payload.get("latitude"),
         12.9716
@@ -1557,7 +1704,8 @@ def predict_event_impact(payload):
         hour=hour,
         weekday=weekday,
         month=month,
-        profile=profile
+        profile=profile,
+        calendar_context=calendar_context
     )
 
     spatial_model = load_spatial_model_optional()
@@ -1574,7 +1722,8 @@ def predict_event_impact(payload):
             weekday=weekday,
             month=month,
             profile=profile,
-            location_match=location_match
+            location_match=location_match,
+            calendar_context=calendar_context
         )
 
     if spatial_model is not None and spatial_X is not None:
@@ -1957,6 +2106,10 @@ def predict_event_impact(payload):
             "lag_2": X.loc[0, "lag_2"],
             "lag_3": X.loc[0, "lag_3"],
             "lag_24": X.loc[0, "lag_24"],
+
+            "any_incident_last_3h": X.loc[0, "any_incident_last_3h"],
+            "incidents_last_24h": X.loc[0, "incidents_last_24h"],
+            "above_corridor_avg": X.loc[0, "above_corridor_avg"],
 
             "rolling_6": X.loc[0, "rolling_6"],
             "rolling_24": X.loc[0, "rolling_24"],

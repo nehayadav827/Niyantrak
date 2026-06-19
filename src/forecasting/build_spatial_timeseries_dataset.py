@@ -1,7 +1,9 @@
 import joblib
 import numpy as np
 import pandas as pd
-
+from src.features.event_calender import (
+    add_event_calendar_features_to_spatial_timeseries,
+)
 from src.inference.location_resolver import (
     haversine_distance_meters,
     is_bad_corridor_name,
@@ -22,6 +24,9 @@ SPATIAL_FEATURES = [
     "hour",
     "weekday",
     "month",
+"is_event_day",
+"calendar_event_type",
+"calendar_event_intensity",
 
     "hour_sin",
     "hour_cos",
@@ -830,6 +835,10 @@ def build_spatial_timeseries_dataset(df, store):
     spatial_ts["hour_cos"] = np.cos(
         2 * np.pi * spatial_ts["hour"] / 24
     )
+    spatial_ts = add_event_calendar_features_to_spatial_timeseries(
+        spatial_ts=spatial_ts,
+        cluster_centers=centers
+    )
 
     spatial_ts = add_lag_and_rolling_features(
         spatial_ts
@@ -837,7 +846,10 @@ def build_spatial_timeseries_dataset(df, store):
 
     for col in SPATIAL_FEATURES:
         if col not in spatial_ts.columns:
-            spatial_ts[col] = 0
+            if col == "calendar_event_type":
+                spatial_ts[col] = "none"
+            else:
+                spatial_ts[col] = 0
 
     spatial_ts = spatial_ts[
         [

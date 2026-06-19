@@ -31,6 +31,9 @@ FEATURES = [
     "hour",
     "weekday",
     "month",
+"is_event_day",
+"calendar_event_type",
+"calendar_event_intensity",
 
     "hour_sin",
     "hour_cos",
