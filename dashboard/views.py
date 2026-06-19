@@ -22,7 +22,7 @@ DEFAULT_FORM = {
     "timestamp": "",
     "requires_road_closure": "no",
 
-    "crowd_size": "small",
+    "crowd_size": "unknown",
     "weather": "clear",
 }
 

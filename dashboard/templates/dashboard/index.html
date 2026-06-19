@@ -293,9 +293,13 @@
             </div>
 
             <div class="field">
-                <label>Crowd size / attendance estimate</label>
-
+                <label>Crowd Size</label>
+                <small>Used only for planned / crowd-bearing events.</small>
                 <select name="crowd_size" id="crowd_size">
+                    <option value="unknown" {% if form.crowd_size == "unknown" %}selected{% endif %}>
+                        Unknown / Not applicable
+                    </option>
+
                     <option value="small" {% if form.crowd_size == "small" %}selected{% endif %}>
                         Small (&lt; 500)
                     </option>
@@ -726,16 +730,16 @@
                         </div>
 
                         <div class="kv">
-                            <span>Crowd Size</span>
+                            <span>Crowd Size Used</span>
                             <strong class="mono">
-                                {{ result.input.crowd_size|title }}
+                                {{ result.event.crowd_size_used|default:"not_applicable" }}
                             </strong>
                         </div>
 
                         <div class="kv">
                             <span>Crowd Multiplier</span>
                             <strong class="mono">
-                                ×{{ result.event.crowd_multiplier|floatformat:2 }}
+                                {{ result.event.crowd_multiplier|floatformat:2 }}x
                             </strong>
                         </div>
 
