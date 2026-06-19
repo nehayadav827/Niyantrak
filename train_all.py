@@ -1,6 +1,27 @@
 import os
 import traceback
 
+
+
+import csv
+
+# The data including the header and your specific rows
+data = [
+    ['police_station', 'latitude', 'longitude'],
+    ['Cubbon Park Traffic Police Station', 12.9766, 77.5993],
+    ['Ashok Nagar Traffic Police Station', 12.9662, 77.6068],
+    ['Indiranagar Traffic Police Station', 12.9784, 77.6408],
+    ['Madiwala Traffic Police Station', 12.9212, 77.6175],
+    ['Whitefield Traffic Police Station', 12.9698, 77.7500]
+]
+
+# 'w' mode creates the file (or overwrites it if it already exists)
+with open('data/police_station.csv', mode='w', newline='', encoding='utf-8') as file:
+    writer = csv.writer(file)
+    writer.writerows(data)
+
+print("File 'police_station.csv' has been created successfully.")
+
 from config import (
     DATA_PATH,
     FEATURE_STORE_PATH,
