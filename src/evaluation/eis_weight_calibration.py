@@ -52,6 +52,10 @@ FEATURES = [
     "lag_72",
     "lag_168",
 
+    "any_incident_last_3h",
+    "incidents_last_24h",
+    "above_corridor_avg",
+
     "rolling_6",
     "rolling_12",
     "rolling_24",
@@ -66,7 +70,6 @@ FEATURES = [
     "closure_risk",
     "cluster_risk",
 ]
-
 
 CANDIDATE_WEIGHTS = [
     {

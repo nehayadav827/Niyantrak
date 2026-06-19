@@ -35,6 +35,9 @@ SPATIAL_FEATURES = [
     "lag_48",
     "lag_72",
     "lag_168",
+    "any_incident_last_3h",
+    "incidents_last_24h",
+    "above_corridor_avg",
 
     "rolling_6",
     "rolling_12",
@@ -51,7 +54,6 @@ SPATIAL_FEATURES = [
     "cluster_risk",
 ]
 
-
 PROFILE_FEATURES = [
     "lag_1",
     "lag_2",
@@ -60,6 +62,10 @@ PROFILE_FEATURES = [
     "lag_48",
     "lag_72",
     "lag_168",
+
+    "any_incident_last_3h",
+    "incidents_last_24h",
+    "above_corridor_avg",
 
     "rolling_6",
     "rolling_12",
@@ -438,18 +444,21 @@ def build_static_cluster_features(df, store):
         static_rows
     )
 
-
 def add_lag_and_rolling_features(spatial_ts):
     spatial_ts = spatial_ts.sort_values(
         [
             "spatial_cluster_id",
             "time_bucket"
         ]
-    )
+    ).copy()
 
     grouped = spatial_ts.groupby(
         "spatial_cluster_id"
     )["incident_count"]
+
+    # ------------------------------------------------
+    # Lag features
+    # ------------------------------------------------
 
     for lag in [
         1,
@@ -465,7 +474,12 @@ def add_lag_and_rolling_features(spatial_ts):
             .shift(lag)
         )
 
-    shifted = grouped.shift(1)
+    # ------------------------------------------------
+    # Rolling features
+    # Use shifted values to avoid leakage from current hour
+    # ------------------------------------------------
+
+    shifted_incidents = grouped.shift(1)
 
     for window in [
         6,
@@ -474,12 +488,16 @@ def add_lag_and_rolling_features(spatial_ts):
         168
     ]:
         spatial_ts[f"rolling_{window}"] = (
-            shifted
+            shifted_incidents
             .groupby(spatial_ts["spatial_cluster_id"])
             .rolling(window)
             .mean()
             .reset_index(level=0, drop=True)
         )
+
+    # ------------------------------------------------
+    # Cluster average / volatility
+    # ------------------------------------------------
 
     cluster_avg = (
         spatial_ts
@@ -505,10 +523,96 @@ def add_lag_and_rolling_features(spatial_ts):
         .fillna(0)
     )
 
-    spatial_ts[PROFILE_FEATURES] = (
-        spatial_ts[PROFILE_FEATURES]
+    # ------------------------------------------------
+    # Fill base lag / rolling columns first
+    # ------------------------------------------------
+
+    base_numeric_features = [
+        "lag_1",
+        "lag_2",
+        "lag_3",
+        "lag_24",
+        "lag_48",
+        "lag_72",
+        "lag_168",
+
+        "rolling_6",
+        "rolling_12",
+        "rolling_24",
+        "rolling_168",
+
+        "corridor_avg",
+        "corridor_volatility",
+
+        "zone_risk",
+        "junction_risk",
+        "cause_risk",
+        "closure_risk",
+        "cluster_risk",
+    ]
+
+    for col in base_numeric_features:
+        if col not in spatial_ts.columns:
+            spatial_ts[col] = 0.0
+
+        spatial_ts[col] = pd.to_numeric(
+            spatial_ts[col],
+            errors="coerce"
+        ).fillna(0.0)
+
+    # ------------------------------------------------
+    # New compressed lag-signal features
+    # ------------------------------------------------
+
+    spatial_ts["any_incident_last_3h"] = (
+        (
+            (spatial_ts["lag_1"] > 0)
+            |
+            (spatial_ts["lag_2"] > 0)
+            |
+            (spatial_ts["lag_3"] > 0)
+        )
+        .astype(int)
+    )
+
+    spatial_ts["incidents_last_24h"] = (
+        spatial_ts["rolling_24"]
+        *
+        24
+    )
+
+    spatial_ts["incidents_last_24h"] = (
+        spatial_ts["incidents_last_24h"]
+        .replace(
+            [
+                float("inf"),
+                -float("inf")
+            ],
+            0
+        )
         .fillna(0)
     )
+
+    spatial_ts["above_corridor_avg"] = (
+        spatial_ts["rolling_6"]
+        >
+        spatial_ts["corridor_avg"]
+    ).astype(int)
+
+    # ------------------------------------------------
+    # Final safe fill
+    # Do not use spatial_ts[PROFILE_FEATURES] = ...
+    # because duplicate/mismatched columns can crash pandas.
+    # ------------------------------------------------
+
+    for col in PROFILE_FEATURES:
+        if col not in spatial_ts.columns:
+            spatial_ts[col] = 0.0
+
+        spatial_ts[col] = pd.to_numeric(
+            spatial_ts[col],
+            errors="coerce"
+        ).fillna(0.0)
 
     return spatial_ts
 

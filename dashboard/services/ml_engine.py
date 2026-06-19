@@ -85,6 +85,10 @@ FEATURES = [
     "lag_72",
     "lag_168",
 
+    "any_incident_last_3h",
+    "incidents_last_24h",
+    "above_corridor_avg",
+
     "rolling_6",
     "rolling_12",
     "rolling_24",
@@ -393,6 +397,10 @@ def build_spatial_input_row(
         "lag_72": safe_float(profile.get("lag_72"), 0.0),
         "lag_168": safe_float(profile.get("lag_168"), 0.0),
 
+        "any_incident_last_3h": safe_float(profile.get("any_incident_last_3h"), 0.0),
+        "incidents_last_24h": safe_float(profile.get("incidents_last_24h"), 0.0),
+        "above_corridor_avg": safe_float(profile.get("above_corridor_avg"), 0.0),
+
         "rolling_6": safe_float(profile.get("rolling_6"), 0.0),
         "rolling_12": safe_float(profile.get("rolling_12"), 0.0),
         "rolling_24": safe_float(profile.get("rolling_24"), 0.0),
@@ -434,6 +442,10 @@ def build_spatial_input_row(
         "lag_72",
         "lag_168",
 
+        "any_incident_last_3h",
+        "incidents_last_24h",
+        "above_corridor_avg",
+
         "rolling_6",
         "rolling_12",
         "rolling_24",
@@ -462,17 +474,6 @@ def estimate_corridor_state_for_diversion(
     model,
     store
 ):
-    """
-    Lightweight corridor forecast for diversion ranking.
-
-    This does NOT call predict_event_impact().
-    It checks whether a candidate diversion corridor is safe right now.
-
-    Important:
-    We rank by route pressure score, not only predicted incidents,
-    because rare-event hurdle models often output 0 incident count.
-    """
-
     try:
         location_match_stub = {
             "confidence": "MEDIUM",
@@ -536,16 +537,13 @@ def estimate_corridor_state_for_diversion(
         )
 
         return {
-            # Used by diversion_engine ranking
             "forecast_score": route_pressure["route_pressure_score"],
             "forecast_level": route_pressure["route_pressure_level"],
 
-            # Keep pure ML values separately for honesty
             "ml_forecast_score": ml_forecast_score,
             "ml_forecast_level": ml_forecast_level,
             "predicted_incidents": candidate_predicted_incidents,
 
-            # Route pressure explainability
             "historical_load": route_pressure["historical_load"],
             "load_score": route_pressure["load_score"],
             "alert_score": route_pressure["alert_score"],
@@ -795,13 +793,6 @@ def calculate_operational_after_event_index(
     weather,
     store
 ):
-    """
-    Separate display index from pure ML count.
-
-    The ML predicted_incidents stays honest.
-    This value estimates operational pressure after the event.
-    """
-
     normal_baseline = max(
         safe_float(normal_baseline),
         0.0
@@ -1009,11 +1000,6 @@ def build_prediction_interval(
     model=None,
     X=None
 ):
-    """
-    Prefer CatBoost quantile interval if available.
-    Fallback to RMSE-based uncertainty only if quantile models are missing.
-    """
-
     predicted_incidents = safe_float(
         predicted_incidents,
         0.0
@@ -1052,8 +1038,6 @@ def build_prediction_interval(
                 raw_upper
             )
 
-            # Hurdle gating:
-            # If classifier says low incident probability, interval should shrink toward zero.
             threshold = safe_float(
                 model.get("alert_threshold"),
                 0.50
@@ -1123,7 +1107,6 @@ def build_prediction_interval(
         except Exception:
             pass
 
-    # Fallback if quantile models are not trained yet.
     rmse = safe_float(
         model_metrics.get("rmse"),
         0.50
@@ -1352,7 +1335,6 @@ def build_operational_metrics(model_metrics):
     }
 
 
-
 def calculate_route_pressure_score(
     profile,
     store,
@@ -1360,14 +1342,6 @@ def calculate_route_pressure_score(
     predicted_incidents,
     alert_probability
 ):
-    """
-    Diversion ranking should not use only predicted incident count.
-
-    The hurdle model often returns 0 for rare events.
-    For diversion route safety, we also need historical route pressure:
-    rolling load, corridor average, volatility, and alert probability.
-    """
-
     incident_p95 = max(
         safe_float(store.get("incident_p95"), 1.0),
         1.0
@@ -1478,8 +1452,6 @@ def calculate_route_pressure_score(
         "volatility_score": volatility_score,
         "predicted_score": predicted_score,
     }
-
-
 
 
 def predict_event_impact(payload):
@@ -1735,6 +1707,17 @@ def predict_event_impact(payload):
         corridor_states=diversion_corridor_states
     )
 
+    # Inject the actual state values back into the diversion object for frontend display
+    if "candidate_evaluations" in diversion:
+        for item in diversion["candidate_evaluations"]:
+            c = item["corridor"]
+            if c in diversion_corridor_states:
+                state = diversion_corridor_states[c]
+                item["forecast_score"] = state["forecast_score"]
+                item["forecast_level"] = state["forecast_level"]
+                item["historical_load"] = state["historical_load"]
+                item["predicted_incidents"] = state["predicted_incidents"]
+
     duration = estimate_duration_minutes(
         predicted_incidents=predicted_incidents,
         final_risk_level=final_level,
@@ -1939,16 +1922,13 @@ def predict_event_impact(payload):
         "baseline": {
             "normal_baseline": normal_baseline,
 
-            # This is operational pressure after event, not pure ML count.
             "predicted_after_event": expected_after_event,
 
-            # Pure model count is kept separately for honesty.
             "ml_predicted_incidents": predicted_incidents,
 
             "expected_delta": expected_delta,
             "percentage_increase": percentage_increase,
 
-            # Correct risk comparison.
             "normal_risk_score": forecast_score,
             "with_event_risk_score": final_score,
             "risk_delta_points": risk_delta_points,

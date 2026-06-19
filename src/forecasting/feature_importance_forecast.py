@@ -9,33 +9,41 @@ def forecast_feature_importance():
     )
 
     features = [
+    "corridor",
 
-        "corridor",
+    "hour",
+    "weekday",
+    "month",
 
-        "hour",
-        "weekday",
-        "month",
+    "hour_sin",
+    "hour_cos",
 
-        "hour_sin",
-        "hour_cos",
+    "lag_1",
+    "lag_2",
+    "lag_3",
+    "lag_24",
+    "lag_48",
+    "lag_72",
+    "lag_168",
 
-        "lag_1",
-        "lag_2",
-        "lag_3",
+    "any_incident_last_3h",
+    "incidents_last_24h",
+    "above_corridor_avg",
 
-        "lag_24",
-        "lag_48",
-        "lag_72",
-        "lag_168",
+    "rolling_6",
+    "rolling_12",
+    "rolling_24",
+    "rolling_168",
 
-        "rolling_6",
-        "rolling_24",
-        "rolling_168",
+    "corridor_avg",
+    "corridor_volatility",
 
-        "corridor_avg",
-        "corridor_volatility"
-
-    ]
+    "zone_risk",
+    "junction_risk",
+    "cause_risk",
+    "closure_risk",
+    "cluster_risk",
+]
 
     imp = pd.DataFrame({
         "feature": features,

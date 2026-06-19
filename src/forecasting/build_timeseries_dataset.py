@@ -15,6 +15,56 @@ def normalize_datetime_utc_naive(series):
     )
 
 
+def add_derived_lag_features(ts_df):
+    required_cols = [
+        "lag_1",
+        "lag_2",
+        "lag_3",
+        "rolling_6",
+        "rolling_24",
+        "corridor_avg",
+    ]
+
+    for col in required_cols:
+        if col not in ts_df.columns:
+            ts_df[col] = 0.0
+
+        ts_df[col] = pd.to_numeric(
+            ts_df[col],
+            errors="coerce"
+        ).fillna(0.0)
+
+    ts_df["any_incident_last_3h"] = (
+        (
+            (ts_df["lag_1"] > 0)
+            |
+            (ts_df["lag_2"] > 0)
+            |
+            (ts_df["lag_3"] > 0)
+        )
+        .astype(int)
+    )
+
+    ts_df["incidents_last_24h"] = (
+        ts_df["rolling_24"]
+        *
+        24
+    )
+
+    ts_df["incidents_last_24h"] = (
+        ts_df["incidents_last_24h"]
+        .replace([float("inf"), -float("inf")], 0)
+        .fillna(0)
+    )
+
+    ts_df["above_corridor_avg"] = (
+        ts_df["rolling_6"]
+        >
+        ts_df["corridor_avg"]
+    ).astype(int)
+
+    return ts_df
+
 
 def build_timeseries_dataset(df):
 
@@ -398,7 +448,7 @@ def build_timeseries_dataset(df):
         .map(corridor_std)
         .fillna(0)
     )
-
+    ts_df = add_derived_lag_features(ts_df)
     # ====================================================
     # DROP NA FROM LAGS / ROLLINGS
     # ====================================================

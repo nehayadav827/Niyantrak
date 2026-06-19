@@ -1,47 +1,59 @@
 import os
+import traceback
 
-from config import DATA_PATH
-from config import FEATURE_STORE_PATH
-
-
-from src.forecasting.train_spatial_timeseries_model import (
-    train_spatial_timeseries_model
+from config import (
+    DATA_PATH,
+    FEATURE_STORE_PATH,
 )
 
 from src.preprocessing.load_data import load_data
 
 from src.forecasting.build_timeseries_dataset import (
-    build_timeseries_dataset
+    build_timeseries_dataset,
 )
 
 from src.forecasting.cross_validate_timeseries import (
-    cross_validate_timeseries
+    cross_validate_timeseries,
 )
 
 from src.forecasting.train_timeseries_model import (
-    train_timeseries_model
+    train_timeseries_model,
 )
 
 from src.forecasting.forecast_feature_importance import (
-    forecast_feature_importance
+    forecast_feature_importance,
 )
 
 from src.inference.feature_store import (
-    build_feature_store
+    build_feature_store,
+)
+
+from src.forecasting.train_spatial_timeseries_model import (
+    train_spatial_timeseries_model,
 )
 
 from src.evaluation.cluster_fallback_ablation import (
-    run_cluster_fallback_ablation
+    run_cluster_fallback_ablation,
 )
 
 from src.forecasting.train_quantile_intervals import (
-    train_quantile_intervals
+    train_quantile_intervals,
 )
 
 from src.evaluation.eis_weight_calibration import (
-    run_eis_weight_calibration
+    run_eis_weight_calibration,
 )
 
+
+# ============================================================
+# FINAL FEATURE LIST
+# Corridor-hour fallback model features
+# Must match:
+# - build_timeseries_dataset.py
+# - train_timeseries_model.py
+# - dashboard/services/ml_engine.py
+# - feature_store.py
+# ============================================================
 
 FEATURES = [
     "corridor",
@@ -61,6 +73,11 @@ FEATURES = [
     "lag_72",
     "lag_168",
 
+    # New compressed lag-signal features
+    "any_incident_last_3h",
+    "incidents_last_24h",
+    "above_corridor_avg",
+
     "rolling_6",
     "rolling_12",
     "rolling_24",
@@ -77,172 +94,239 @@ FEATURES = [
 ]
 
 
+def print_banner(title):
+    print("\n" + "=" * 90)
+    print(title)
+    print("=" * 90)
+
+
 def print_step(step_no, title):
-    print("\n" + "=" * 80)
+    print("\n" + "-" * 90)
     print(f"STEP {step_no}: {title}")
-    print("=" * 80)
+    print("-" * 90)
+
+
+def run_required_step(step_no, title, func, *args, **kwargs):
+    print_step(step_no, title)
+
+    try:
+        result = func(*args, **kwargs)
+        print(f"\n[SUCCESS] {title}")
+        return result
+
+    except Exception as e:
+        print(f"\n[FAILED] {title}")
+        print(str(e))
+        traceback.print_exc()
+        raise
+
+
+def run_optional_step(step_no, title, func, *args, **kwargs):
+    """
+    Optional steps should not break the whole training pipeline.
+
+    Used for:
+    - validation/evidence files
+    - calibration reports
+    - interval add-ons
+
+    If these fail, the main model still exists.
+    """
+
+    print_step(step_no, title)
+
+    try:
+        result = func(*args, **kwargs)
+        print(f"\n[SUCCESS] {title}")
+        return result
+
+    except Exception as e:
+        print(f"\n[WARNING] Optional step failed: {title}")
+        print(str(e))
+        traceback.print_exc()
+        return None
 
 
 def main():
-
-    print("\n" + "=" * 80)
-    print("TRAINING FULL TRAFFIC INTELLIGENCE PIPELINE")
-    print("=" * 80)
+    print_banner(
+        "FULL TRAFFIC INTELLIGENCE ML TRAINING PIPELINE"
+    )
 
     os.makedirs(
         "models",
-        exist_ok=True
+        exist_ok=True,
     )
 
-    # =====================================================
-    # STEP 1: LOAD DATA
-    # =====================================================
+    # ========================================================
+    # STEP 1: LOAD RAW DATA
+    # ========================================================
 
-    print_step(
+    df = run_required_step(
         1,
-        "Loading Data"
+        "Loading Raw Traffic Dataset",
+        load_data,
+        DATA_PATH,
     )
 
-    df = load_data(
-        DATA_PATH
-    )
+    # ========================================================
+    # STEP 2: BUILD CORRIDOR-HOUR TIME-SERIES DATASET
+    # ========================================================
 
-    # =====================================================
-    # STEP 2: BUILD TIME-SERIES DATASET
-    # =====================================================
-
-    print_step(
+    ts_df = run_required_step(
         2,
-        "Building Time-Series Forecast Dataset"
+        "Building Corridor-Hour Time-Series Dataset",
+        build_timeseries_dataset,
+        df,
     )
 
-    ts_df = build_timeseries_dataset(
-        df
-    )
+    print("\nFinal Corridor-Hour Forecast Dataset Shape:")
+    print(ts_df.shape)
 
-    print("\nFinal Forecast Dataset Shape:")
-    print(
-        ts_df.shape
-    )
+    # ========================================================
+    # STEP 3: TIME-SERIES CROSS VALIDATION
+    # ========================================================
 
-    # =====================================================
-    # STEP 3: CROSS VALIDATION
-    # =====================================================
-
-    print_step(
+    run_required_step(
         3,
-        "Running Time-Series Cross Validation"
+        "Running Time-Series Cross Validation",
+        cross_validate_timeseries,
+        ts_df,
     )
 
-    cross_validate_timeseries(
-        ts_df
-    )
+    # ========================================================
+    # STEP 4: TRAIN CORRIDOR-HOUR HURDLE MODEL
+    # This is the fallback model.
+    # ========================================================
 
-    # =====================================================
-    # STEP 4: TRAIN FINAL HURDLE FORECAST MODEL
-    # =====================================================
-
-    print_step(
+    corridor_model = run_required_step(
         4,
-        "Training Final Zero-Inflated Forecast Model"
+        "Training Corridor-Hour Zero-Inflated CatBoost Hurdle Model",
+        train_timeseries_model,
+        ts_df,
     )
 
-    model = train_timeseries_model(
-        ts_df
-    )
+    # ========================================================
+    # STEP 5: FORECAST FEATURE IMPORTANCE
+    # ========================================================
 
-    # =====================================================
-    # STEP 5: FEATURE IMPORTANCE
-    # =====================================================
-
-    print_step(
+    run_optional_step(
         5,
-        "Saving Forecast Feature Importance"
+        "Saving Forecast Feature Importance",
+        forecast_feature_importance,
+        corridor_model,
+        FEATURES,
     )
 
-    forecast_feature_importance(
-        model,
-        FEATURES
-    )
-
-    # =====================================================
+    # ========================================================
     # STEP 6: BUILD COORDINATE-AWARE FEATURE STORE
-    # =====================================================
+    # Needed by:
+    # - coordinate resolver
+    # - spatial cluster model
+    # - inference
+    # - ablation
+    # - EIS calibration
+    # ========================================================
 
-    print_step(
+    run_required_step(
         6,
-        "Building Coordinate-Aware Feature Store"
-    )
-
-    build_feature_store(
+        "Building Coordinate-Aware Feature Store",
+        build_feature_store,
         data_path=DATA_PATH,
-        output_path=FEATURE_STORE_PATH
+        output_path=FEATURE_STORE_PATH,
     )
 
-    # =====================================================
-    # STEP 7: CLUSTER FALLBACK ABLATION STUDY
-    # =====================================================
+    # ========================================================
+    # STEP 7: TRAIN PRIMARY SPATIAL-CLUSTER MODEL
+    # This fixes the earlier corridor-only limitation.
+    #
+    # Old:
+    #   corridor × hour
+    #
+    # New primary:
+    #   spatial_cluster_id × hour
+    #   + latitude / longitude
+    #   + hotspot distance
+    #   + corridor distance
+    #   + spatial density
+    #   + lag-derived features
+    # ========================================================
 
-    print_step(
+    run_required_step(
         7,
-        "Training Primary Spatial-Cluster Forecast Model"
-    )
-
-    train_spatial_timeseries_model(
+        "Training Primary Spatial-Cluster-Hour Forecast Model",
+        train_spatial_timeseries_model,
         data_path=DATA_PATH,
         feature_store_path=FEATURE_STORE_PATH,
-        output_path="models/spatial_timeseries_forecast_model.pkl"
+        output_path="models/spatial_timeseries_forecast_model.pkl",
     )
 
-    run_cluster_fallback_ablation(
-        data_path=DATA_PATH,
-        output_path="models/cluster_fallback_ablation.json"
-    )
+    # ========================================================
+    # STEP 8: CLUSTER FALLBACK ABLATION STUDY
+    # Proves whether spatial cluster fallback should replace
+    # or only support corridor-hour history.
+    # ========================================================
 
-    # =====================================================
-    # STEP 8: TRAIN CATBOOST QUANTILE INTERVAL MODELS
-    # =====================================================
-
-    print_step(
+    run_optional_step(
         8,
-        "Training CatBoost Quantile Interval Models"
+        "Running Cluster Fallback Ablation Study",
+        run_cluster_fallback_ablation,
+        data_path=DATA_PATH,
+        output_path="models/cluster_fallback_ablation.json",
+        max_rows=5000,
     )
 
-    train_quantile_intervals(
-        data_path=DATA_PATH
-    )
+    # ========================================================
+    # STEP 9: TRAIN CATBOOST QUANTILE INTERVAL MODELS
+    # Adds 80% prediction interval support.
+    # Attaches quantile models to the forecast bundle.
+    # ========================================================
 
-    # =====================================================
-    # STEP 9: EIS WEIGHT MICRO-CALIBRATION
-    # =====================================================
-
-    print_step(
+    run_optional_step(
         9,
-        "Running EIS Weight Micro-Calibration"
+        "Training CatBoost Quantile Interval Models",
+        train_quantile_intervals,
+        data_path=DATA_PATH,
     )
 
-    run_eis_weight_calibration(
+    # ========================================================
+    # STEP 10: EIS WEIGHT MICRO-CALIBRATION
+    # Selects EIS weights using historical severity proxy.
+    # ========================================================
+
+    run_optional_step(
+        10,
+        "Running EIS Weight Micro-Calibration",
+        run_eis_weight_calibration,
         data_path=DATA_PATH,
         output_path="models/eis_weight_calibration.json",
-        sample_size=20
+        sample_size=20,
     )
 
-    # =====================================================
-    # COMPLETE
-    # =====================================================
+    # ========================================================
+    # DONE
+    # ========================================================
 
-    print("\n" + "=" * 80)
-    print("FULL TRAINING PIPELINE COMPLETE")
-    print("=" * 80)
+    print_banner(
+        "FULL ML TRAINING PIPELINE COMPLETE"
+    )
 
     print("\nGenerated / Updated Files:")
     print("- models/timeseries_forecast_model.pkl")
     print("- models/timeseries_forecast.pkl")
+    print("- models/spatial_timeseries_forecast_model.pkl")
     print("- models/traffic_feature_store.pkl")
     print("- models/cluster_fallback_ablation.json")
     print("- models/eis_weight_calibration.json")
     print("- EIS_WEIGHT_CALIBRATION.md")
     print("- forecast_feature_importance.png")
+
+    print("\nModel Roles:")
+    print("- spatial_timeseries_forecast_model.pkl  -> primary point-aware spatial-cluster model")
+    print("- timeseries_forecast_model.pkl          -> corridor-hour fallback model")
+    print("- traffic_feature_store.pkl              -> coordinate resolver + historical profile store")
+    print("- cluster_fallback_ablation.json         -> evidence for fallback behavior")
+    print("- eis_weight_calibration.json            -> calibrated EIS weights")
+    print("- quantile models inside forecast bundle -> 80% prediction interval")
 
     print("\nNext command:")
     print("python manage.py runserver")

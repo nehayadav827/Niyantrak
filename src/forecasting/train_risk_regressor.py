@@ -17,19 +17,41 @@ def train_risk_regressor(risk_df):
 
     print("\nPreparing Risk Forecast Features...")
 
-    features = [
-
+    FEATURES = [
         "corridor",
-        "event_cause",
-        "requires_road_closure",
 
         "hour",
         "weekday",
         "month",
 
-        "corridor_risk",
-        "cause_risk"
+        "hour_sin",
+        "hour_cos",
 
+        "lag_1",
+        "lag_2",
+        "lag_3",
+        "lag_24",
+        "lag_48",
+        "lag_72",
+        "lag_168",
+
+        "any_incident_last_3h",
+        "incidents_last_24h",
+        "above_corridor_avg",
+
+        "rolling_6",
+        "rolling_12",
+        "rolling_24",
+        "rolling_168",
+
+        "corridor_avg",
+        "corridor_volatility",
+
+        "zone_risk",
+        "junction_risk",
+        "cause_risk",
+        "closure_risk",
+        "cluster_risk",
     ]
 
     X = risk_df[features].copy()

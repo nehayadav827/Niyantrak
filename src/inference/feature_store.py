@@ -26,6 +26,10 @@ FEATURES = [
     "lag_72",
     "lag_168",
 
+    "any_incident_last_3h",
+    "incidents_last_24h",
+    "above_corridor_avg",
+
     "rolling_6",
     "rolling_12",
     "rolling_24",
@@ -40,7 +44,6 @@ FEATURES = [
     "closure_risk",
     "cluster_risk",
 ]
-
 
 PROFILE_FEATURES = [
     "lag_1",
@@ -51,6 +54,10 @@ PROFILE_FEATURES = [
     "lag_72",
     "lag_168",
 
+    "any_incident_last_3h",
+    "incidents_last_24h",
+    "above_corridor_avg",
+
     "rolling_6",
     "rolling_12",
     "rolling_24",
@@ -65,6 +72,63 @@ PROFILE_FEATURES = [
     "closure_risk",
     "cluster_risk",
 ]
+
+
+def add_derived_lag_features(df):
+    required_cols = [
+        "lag_1",
+        "lag_2",
+        "lag_3",
+        "rolling_6",
+        "rolling_24",
+        "corridor_avg",
+    ]
+
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+
+        df[col] = pd.to_numeric(
+            df[col],
+            errors="coerce"
+        ).fillna(0.0)
+
+    df["any_incident_last_3h"] = (
+        (
+            (df["lag_1"] > 0)
+            |
+            (df["lag_2"] > 0)
+            |
+            (df["lag_3"] > 0)
+        )
+        .astype(int)
+    )
+
+    df["incidents_last_24h"] = (
+        df["rolling_24"]
+        *
+        24
+    )
+
+    df["incidents_last_24h"] = (
+        df["incidents_last_24h"]
+        .replace(
+            [
+                float("inf"),
+                -float("inf")
+            ],
+            0
+        )
+        .fillna(0)
+    )
+
+    df["above_corridor_avg"] = (
+        df["rolling_6"]
+        >
+        df["corridor_avg"]
+    ).astype(int)
+
+    return df
 
 
 def make_key(
@@ -536,6 +600,9 @@ def build_location_and_cluster_store(
         .fillna(0)
     )
 
+    # Add derived features before profile selection
+    cluster_ts = add_derived_lag_features(cluster_ts)
+
     cluster_ts[PROFILE_FEATURES] = (
         cluster_ts[PROFILE_FEATURES]
         .fillna(0)
@@ -627,6 +694,9 @@ def build_feature_store(
     ts_df = build_timeseries_dataset(
         df
     )
+
+    # Ensure all derived features are present before profile aggregation
+    ts_df = add_derived_lag_features(ts_df)
 
     os.makedirs(
         "models",
