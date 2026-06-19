@@ -3,6 +3,11 @@ import os
 from config import DATA_PATH
 from config import FEATURE_STORE_PATH
 
+
+from src.forecasting.train_spatial_timeseries_model import (
+    train_spatial_timeseries_model
+)
+
 from src.preprocessing.load_data import load_data
 
 from src.forecasting.build_timeseries_dataset import (
@@ -180,7 +185,13 @@ def main():
 
     print_step(
         7,
-        "Running Cluster Fallback Ablation Study"
+        "Training Primary Spatial-Cluster Forecast Model"
+    )
+
+    train_spatial_timeseries_model(
+        data_path=DATA_PATH,
+        feature_store_path=FEATURE_STORE_PATH,
+        output_path="models/spatial_timeseries_forecast_model.pkl"
     )
 
     run_cluster_fallback_ablation(

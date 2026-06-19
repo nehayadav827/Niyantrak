@@ -9,6 +9,9 @@ import pandas as pd
 from django.conf import settings
 
 from src.forecasting.forecast_predictor import predict_single_forecast
+from src.forecasting.spatial_forecast_predictor import (
+    predict_single_spatial_forecast
+)
 
 from src.inference.location_resolver import (
     resolve_corridor_from_coordinates,
@@ -47,6 +50,12 @@ MODEL_PATHS = [
     BASE_DIR / "models" / "timeseries_forecast_model.pkl",
     BASE_DIR / "models" / "timeseries_forecast.pkl",
 ]
+
+SPATIAL_MODEL_PATH = (
+    BASE_DIR
+    / "models"
+    / "spatial_timeseries_forecast_model.pkl"
+)
 
 FEATURE_STORE_PATH = (
     BASE_DIR
@@ -90,6 +99,7 @@ FEATURES = [
 
 
 _MODEL_CACHE = None
+_SPATIAL_MODEL_CACHE = None
 _STORE_CACHE = None
 
 
@@ -211,6 +221,22 @@ def load_model():
     )
 
 
+def load_spatial_model_optional():
+    global _SPATIAL_MODEL_CACHE
+
+    if _SPATIAL_MODEL_CACHE is not None:
+        return _SPATIAL_MODEL_CACHE
+
+    if not os.path.exists(SPATIAL_MODEL_PATH):
+        return None
+
+    _SPATIAL_MODEL_CACHE = joblib.load(
+        SPATIAL_MODEL_PATH
+    )
+
+    return _SPATIAL_MODEL_CACHE
+
+
 def load_feature_store():
     global _STORE_CACHE
 
@@ -298,6 +324,131 @@ def build_input_row(
     return pd.DataFrame(
         [row],
         columns=FEATURES
+    )
+
+
+def build_spatial_input_row(
+    latitude,
+    longitude,
+    corridor,
+    hour,
+    weekday,
+    month,
+    profile,
+    location_match
+):
+    cluster_id = location_match.get(
+        "spatial_cluster_id"
+    )
+
+    if cluster_id is None:
+        return None
+
+    hour_sin = np.sin(
+        2 * np.pi * hour / 24
+    )
+
+    hour_cos = np.cos(
+        2 * np.pi * hour / 24
+    )
+
+    row = {
+        "spatial_cluster_id": str(cluster_id),
+
+        "latitude": latitude,
+        "longitude": longitude,
+
+        "dominant_corridor": corridor,
+
+        "nearest_corridor_distance_m": safe_float(
+            location_match.get("distance_m"),
+            9999.0
+        ),
+
+        "nearest_hotspot_distance_m": safe_float(
+            location_match.get("nearest_hotspot_distance_m"),
+            9999.0
+        ),
+
+        "spatial_density_at_point": safe_float(
+            location_match.get("spatial_density_at_point"),
+            0.0
+        ),
+
+        "hour": hour,
+        "weekday": weekday,
+        "month": month,
+
+        "hour_sin": hour_sin,
+        "hour_cos": hour_cos,
+
+        "lag_1": safe_float(profile.get("lag_1"), 0.0),
+        "lag_2": safe_float(profile.get("lag_2"), 0.0),
+        "lag_3": safe_float(profile.get("lag_3"), 0.0),
+        "lag_24": safe_float(profile.get("lag_24"), 0.0),
+        "lag_48": safe_float(profile.get("lag_48"), 0.0),
+        "lag_72": safe_float(profile.get("lag_72"), 0.0),
+        "lag_168": safe_float(profile.get("lag_168"), 0.0),
+
+        "rolling_6": safe_float(profile.get("rolling_6"), 0.0),
+        "rolling_12": safe_float(profile.get("rolling_12"), 0.0),
+        "rolling_24": safe_float(profile.get("rolling_24"), 0.0),
+        "rolling_168": safe_float(profile.get("rolling_168"), 0.0),
+
+        "corridor_avg": safe_float(profile.get("corridor_avg"), 0.0),
+        "corridor_volatility": safe_float(profile.get("corridor_volatility"), 0.0),
+
+        "zone_risk": safe_float(profile.get("zone_risk"), 0.0),
+        "junction_risk": safe_float(profile.get("junction_risk"), 0.0),
+        "cause_risk": safe_float(profile.get("cause_risk"), 0.0),
+        "closure_risk": safe_float(profile.get("closure_risk"), 0.0),
+        "cluster_risk": safe_float(profile.get("cluster_risk"), 0.0),
+    }
+
+    spatial_features = [
+        "spatial_cluster_id",
+
+        "latitude",
+        "longitude",
+
+        "dominant_corridor",
+        "nearest_corridor_distance_m",
+        "nearest_hotspot_distance_m",
+        "spatial_density_at_point",
+
+        "hour",
+        "weekday",
+        "month",
+
+        "hour_sin",
+        "hour_cos",
+
+        "lag_1",
+        "lag_2",
+        "lag_3",
+        "lag_24",
+        "lag_48",
+        "lag_72",
+        "lag_168",
+
+        "rolling_6",
+        "rolling_12",
+        "rolling_24",
+        "rolling_168",
+
+        "corridor_avg",
+        "corridor_volatility",
+
+        "zone_risk",
+        "junction_risk",
+        "cause_risk",
+        "closure_risk",
+        "cluster_risk",
+    ]
+
+    return pd.DataFrame(
+        [row],
+        columns=spatial_features
     )
 
 
@@ -1152,10 +1303,45 @@ def predict_event_impact(payload):
         profile=profile
     )
 
-    predicted_incidents, forecast_details = predict_single_forecast(
-        model,
-        X
-    )
+    spatial_model = load_spatial_model_optional()
+
+    spatial_X = None
+    forecast_source = "corridor-hour fallback model"
+
+    if spatial_model is not None:
+        spatial_X = build_spatial_input_row(
+            latitude=latitude,
+            longitude=longitude,
+            corridor=corridor,
+            hour=hour,
+            weekday=weekday,
+            month=month,
+            profile=profile,
+            location_match=location_match
+        )
+
+    if spatial_model is not None and spatial_X is not None:
+        try:
+            predicted_incidents, forecast_details = predict_single_spatial_forecast(
+                spatial_model,
+                spatial_X
+            )
+
+            forecast_source = "primary spatial-cluster-hour model"
+
+        except Exception:
+            predicted_incidents, forecast_details = predict_single_forecast(
+                model,
+                X
+            )
+
+            forecast_source = "corridor-hour fallback model after spatial failure"
+
+    else:
+        predicted_incidents, forecast_details = predict_single_forecast(
+            model,
+            X
+        )
 
     predicted_incidents = max(
         safe_float(predicted_incidents),
@@ -1433,6 +1619,7 @@ def predict_event_impact(payload):
             "forecast_score": forecast_score,
             "forecast_level": forecast_level,
             "alert_probability": alert_probability,
+            "forecast_source": forecast_source,
         },
 
         "event": {

@@ -579,6 +579,13 @@
                         </div>
 
                         <div class="kv">
+                            <span>Forecast Source</span>
+                            <strong class="mono">
+                                {{ result.forecast.forecast_source }}
+                            </strong>
+                        </div>
+
+                        <div class="kv">
                             <span>Event Impact</span>
                             <strong class="mono">{{ result.event.event_score|floatformat:1 }}%</strong>
                         </div>
