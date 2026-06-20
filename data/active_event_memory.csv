@@ -1,0 +1,11 @@
+event_id,recorded_at,event_datetime,latitude,longitude,corridor,spatial_cluster_id,event_type,event_cause,priority,road_closure,event_score,final_score,severity_score,source
+f5fe142a-0f6c-49ef-a325-fd1d3a317779,2026-06-20T02:21:32,2026-06-20T02:21:32,12.9716,77.5946,Mysore Road,8,unplanned,vehicle_breakdown,High,False,41.7,37.55306958444183,70,dashboard_prediction
+153230c8-52f8-4f0a-b8d2-ee43803219f0,2026-06-20T02:21:50,2026-06-20T02:21:50,12.9716,77.5946,Mysore Road,8,unplanned,vehicle_breakdown,High,False,41.7,51.55306958444183,70,dashboard_prediction
+78412e38-a606-44a8-8569-5f84e146a76e,2026-06-20T02:24:12,2026-06-20T02:24:12,12.9716,77.5946,Mysore Road,8,unplanned,vehicle_breakdown,High,False,41.7,56.45306958444184,70,dashboard_prediction
+2d24c7e7-d6af-4b5a-a404-c4b397018f60,2026-06-20T02:24:47,2026-06-20T02:24:47,12.9716,77.5946,Mysore Road,8,unplanned,vehicle_breakdown,High,False,41.7,57.55306958444183,70,dashboard_prediction
+0609c894-a64a-4c13-afaf-c35a945afa8c,2026-06-20T02:25:01,2026-06-20T02:25:01,12.9716,77.5946,Mysore Road,8,unplanned,vehicle_breakdown,High,False,41.7,57.55306958444183,70,dashboard_prediction
+29833b76-837d-4dcb-acb8-9faf8e05a3c4,2026-06-20T02:25:14,2026-06-20T02:25:14,12.9716,77.5946,Mysore Road,8,unplanned,vehicle_breakdown,High,False,41.7,57.55306958444183,70,dashboard_prediction
+0fb6b387-e878-4fa8-9c64-de934ffdbbbc,2026-06-20T02:25:34,2026-06-20T02:25:34,12.974452,77.577736,Mysore Road,29,unplanned,vehicle_breakdown,High,False,41.7,47.72226627263106,70,dashboard_prediction
+4d2018cd-0643-42d3-9f5f-e1c51137ebc8,2026-06-20T12:42:51,2026-06-20T12:42:51,12.9716,77.5946,Mysore Road,8,unplanned,vehicle_breakdown,High,False,43.7,48.57226627263107,70,dashboard_prediction
+d23a3e5d-4e0c-42e3-b5fa-8b616f2da4b3,2026-06-20T13:12:16,2026-06-20T13:12:16,12.9716,77.5946,Mysore Road,8,unplanned,vehicle_breakdown,High,False,41.7,47.72226627263106,70,dashboard_prediction
+8b61c6b4-d0af-4a4b-9377-23c7d28842fd,2026-06-20T22:08:40,2026-06-20T22:08:40,12.9716,77.5946,Mysore Road,8,unplanned,vehicle_breakdown,High,False,41.7,54.753215994469954,70,dashboard_prediction

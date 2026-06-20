@@ -1,0 +1,2 @@
+submitted_at,event_type,event_cause,priority,latitude,longitude,corridor,predicted_incidents,predicted_duration_minutes,predicted_officers,predicted_barricades,predicted_final_risk,actual_duration_minutes,actual_officers_deployed,actual_barricades_used,actual_road_closure,actual_incident_count,officer_notes
+2026-06-19T12:06:53,unplanned,vehicle_breakdown,High,12.9716,77.5946,Mysore Road,0.0,30,4,1,MODERATE,95,6,3,no,2,
