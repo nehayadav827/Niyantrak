@@ -7,28 +7,22 @@
 :root {
     --bg-dark: #050814;
     --bg-deep: #020617;
-
     --card-bg: rgba(15, 23, 42, 0.58);
     --card-bg-strong: rgba(15, 23, 42, 0.82);
     --card-border: rgba(255, 255, 255, 0.10);
-
     --text-main: #f8fafc;
     --text-soft: #e2e8f0;
     --text-muted: #94a3b8;
-
     --cyan: #06b6d4;
     --cyan-soft: #67e8f9;
     --cyan-glow: rgba(6, 182, 212, 0.42);
-
     --purple: #8b5cf6;
     --purple-soft: #c4b5fd;
     --purple-glow: rgba(139, 92, 246, 0.42);
-
     --green: #22c55e;
     --yellow: #f59e0b;
     --orange: #f97316;
     --red: #ef4444;
-
     --font-sans: "Inter", sans-serif;
     --font-mono: "Space Grotesk", monospace;
 }
@@ -51,8 +45,7 @@ body {
 
 /* ============================================================
    LIQUID BACKGROUND
-============================================================ */
-
+   ============================================================ */
 .liquid-bg {
     position: fixed;
     inset: 0;
@@ -60,8 +53,7 @@ body {
     height: 100vh;
     z-index: -1;
     overflow: hidden;
-    background:
-        linear-gradient(135deg, #020617 0%, #050814 45%, #0b1020 100%);
+    background: linear-gradient(135deg, #020617 0%, #050814 45%, #0b1020 100%);
 }
 
 .blob {
@@ -99,19 +91,13 @@ body {
 }
 
 @keyframes float {
-    0% {
-        transform: translate(0, 0) scale(1);
-    }
-
-    100% {
-        transform: translate(5%, 10%) scale(1.12);
-    }
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(5%, 10%) scale(1.12); }
 }
 
 /* ============================================================
    PAGE + HERO
-============================================================ */
-
+   ============================================================ */
 .page {
     max-width: 1320px;
     margin: 0 auto;
@@ -190,8 +176,7 @@ h1 {
 
 /* ============================================================
    BUTTONS
-============================================================ */
-
+   ============================================================ */
 .demo-row {
     display: flex;
     justify-content: center;
@@ -229,8 +214,7 @@ h1 {
 
 /* ============================================================
    FORM
-============================================================ */
-
+   ============================================================ */
 .form-card {
     background: var(--card-bg);
     backdrop-filter: blur(18px);
@@ -278,10 +262,11 @@ h1 {
     letter-spacing: 0.055em;
 }
 
+/* ── shared base for all interactive inputs ── */
 .field input,
-.field select {
+.field select,
+.field textarea {
     width: 100%;
-    height: 46px;
     background: rgba(2, 6, 23, 0.52);
     border: 1px solid rgba(255, 255, 255, 0.11);
     border-radius: 12px;
@@ -294,14 +279,33 @@ h1 {
         box-shadow 0.25s ease,
         background 0.25s ease;
     outline: none;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
-.field input::placeholder {
+/* single-line inputs & selects keep fixed height */
+.field input,
+.field select {
+    height: 46px;
+}
+
+/* textareas grow naturally — reset padding so text isn't clipped */
+.field textarea {
+    height: auto;
+    padding: 12px 14px;
+    resize: vertical;
+    line-height: 1.6;
+    min-height: 96px;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
     color: rgba(148, 163, 184, 0.65);
 }
 
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
     border-color: var(--cyan);
     background: rgba(2, 6, 23, 0.75);
     box-shadow:
@@ -322,7 +326,6 @@ h1 {
 }
 
 /* Primary Button */
-
 .primary-btn {
     margin-top: 28px;
     width: 100%;
@@ -377,8 +380,7 @@ h1 {
 
 /* ============================================================
    MAP AREA
-============================================================ */
-
+   ============================================================ */
 .content-split {
     display: flex;
     flex-direction: column;
@@ -449,11 +451,6 @@ h1 {
     font-family: var(--font-mono);
 }
 
-/*
-   IMPORTANT:
-   Do not invert whole Leaflet tiles.
-   Real map must stay readable for judging/demo.
-*/
 .leaflet-layer {
     filter: none;
 }
@@ -486,8 +483,6 @@ h1 {
     line-height: 1.55;
     color: #111827;
 }
-
-/* Map floating summary */
 
 .map-overlay-card {
     position: absolute;
@@ -532,24 +527,22 @@ h1 {
     color: var(--text-muted);
 }
 
-/* Map legend */
-
 .map-legend {
-    background: rgba(15, 23, 42, 0.92);
-    color: var(--text-soft);
+    background: rgba(15, 23, 42, 0.94);
+    color: #f8fafc;
     padding: 13px 15px;
     border-radius: 16px;
-    border: 1px solid rgba(148, 163, 184, 0.22);
+    border: 1px solid rgba(148, 163, 184, 0.25);
     box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
     font-size: 13px;
-    min-width: 230px;
+    min-width: 220px;
     backdrop-filter: blur(14px);
 }
 
 .map-legend h4 {
     margin: 0 0 8px 0;
     font-size: 15px;
-    color: #f8fafc;
+    color: #ffffff;
 }
 
 .map-legend span {
@@ -563,14 +556,13 @@ h1 {
 
 .map-legend hr {
     border: none;
-    border-top: 1px solid rgba(148, 163, 184, 0.22);
+    border-top: 1px solid rgba(148, 163, 184, 0.24);
     margin: 8px 0;
 }
 
 /* ============================================================
    RESULT CARDS
-============================================================ */
-
+   ============================================================ */
 .results-container {
     display: flex;
     flex-direction: column;
@@ -580,6 +572,7 @@ h1 {
 .cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+    align-items: start;
     gap: 20px;
 }
 
@@ -614,6 +607,7 @@ h1 {
         0 20px 55px rgba(0, 0, 0, 0.25);
 }
 
+/* Full-width cards span entire grid */
 .card.full {
     grid-column: 1 / -1;
 }
@@ -656,7 +650,7 @@ h2::before {
     border-bottom: 1px solid rgba(255, 255, 255, 0.055);
 }
 
-.kv:last-of-type {
+.kv:not(:has(~ .kv)) {
     border-bottom: none;
 }
 
@@ -684,8 +678,7 @@ h2::before {
 
 /* ============================================================
    RISK BARS
-============================================================ */
-
+   ============================================================ */
 .risk-bars {
     margin-top: 18px;
     display: grid;
@@ -712,22 +705,13 @@ h2::before {
     min-width: 2px;
 }
 
-.bar-fill.forecast {
-    background: linear-gradient(90deg, #38bdf8, #2563eb);
-}
-
-.bar-fill.event {
-    background: linear-gradient(90deg, #f59e0b, #f97316);
-}
-
-.bar-fill.final {
-    background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
-}
+.bar-fill.forecast { background: linear-gradient(90deg, #38bdf8, #2563eb); }
+.bar-fill.event    { background: linear-gradient(90deg, #f59e0b, #f97316); }
+.bar-fill.final    { background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444); }
 
 /* ============================================================
    BADGES + STATUS COLORS
-============================================================ */
-
+   ============================================================ */
 .badge {
     display: inline-flex;
     align-items: center;
@@ -742,9 +726,7 @@ h2::before {
 }
 
 .severity-low,
-.badge.severity-low {
-    color: #4ade80;
-}
+.badge.severity-low    { color: #4ade80; }
 
 .badge.severity-low {
     background: rgba(34, 197, 94, 0.14);
@@ -752,9 +734,7 @@ h2::before {
 }
 
 .severity-moderate,
-.badge.severity-moderate {
-    color: #fbbf24;
-}
+.badge.severity-moderate { color: #fbbf24; }
 
 .badge.severity-moderate {
     background: rgba(245, 158, 11, 0.14);
@@ -762,9 +742,7 @@ h2::before {
 }
 
 .severity-high,
-.badge.severity-high {
-    color: #fb923c;
-}
+.badge.severity-high { color: #fb923c; }
 
 .badge.severity-high {
     background: rgba(249, 115, 22, 0.16);
@@ -772,9 +750,7 @@ h2::before {
 }
 
 .severity-critical,
-.badge.severity-critical {
-    color: #f87171;
-}
+.badge.severity-critical { color: #f87171; }
 
 .badge.severity-critical {
     background: rgba(239, 68, 68, 0.16);
@@ -812,8 +788,7 @@ h2::before {
 
 /* ============================================================
    TERMINAL / LIST / HISTORY
-============================================================ */
-
+   ============================================================ */
 .task-list {
     list-style: none;
     margin-top: 16px;
@@ -895,8 +870,7 @@ h2::before {
 
 /* ============================================================
    COMPARISON TABLE
-============================================================ */
-
+   ============================================================ */
 .comparison-table {
     display: grid;
     gap: 10px;
@@ -914,16 +888,8 @@ h2::before {
     border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.comparison-row span {
-    color: var(--text-muted);
-    font-size: 13px;
-}
-
-.comparison-row strong {
-    color: #ffffff;
-    font-family: var(--font-mono);
-    font-size: 14px;
-}
+.comparison-row span   { color: var(--text-muted); font-size: 13px; }
+.comparison-row strong { color: #ffffff; font-family: var(--font-mono); font-size: 14px; }
 
 .comparison-head {
     background: rgba(6, 182, 212, 0.10);
@@ -939,8 +905,7 @@ h2::before {
 
 /* ============================================================
    LOADING + ERROR + ANIMATION
-============================================================ */
-
+   ============================================================ */
 .loading-overlay {
     position: fixed;
     inset: 0;
@@ -975,20 +940,12 @@ h2::before {
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
 @keyframes pulse {
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.5;
-    }
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
 }
 
 .fade-in {
@@ -1026,8 +983,7 @@ h2::before {
 
 /* ============================================================
    IMPACT MAP MARKERS + CIRCLES
-============================================================ */
-
+   ============================================================ */
 .event-marker {
     background: transparent;
     border: none;
@@ -1069,61 +1025,13 @@ h2::before {
 }
 
 @keyframes markerPulse {
-    0% {
-        transform: scale(0.35);
-        opacity: 0.85;
-    }
-
-    100% {
-        transform: scale(2.2);
-        opacity: 0;
-    }
-}
-
-.map-popup {
-    font-family: "Inter", sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
-    color: #0f172a;
-}
-
-.map-legend {
-    background: rgba(15, 23, 42, 0.94);
-    color: #f8fafc;
-    padding: 13px 15px;
-    border-radius: 16px;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
-    font-size: 13px;
-    min-width: 220px;
-    backdrop-filter: blur(14px);
-}
-
-.map-legend h4 {
-    margin: 0 0 8px 0;
-    font-size: 15px;
-    color: #ffffff;
-}
-
-.map-legend span {
-    display: inline-block;
-    width: 13px;
-    height: 13px;
-    border-radius: 999px;
-    margin-right: 7px;
-    vertical-align: middle;
-}
-
-.map-legend hr {
-    border: none;
-    border-top: 1px solid rgba(148, 163, 184, 0.24);
-    margin: 8px 0;
+    0%   { transform: scale(0.35); opacity: 0.85; }
+    100% { transform: scale(2.2);  opacity: 0; }
 }
 
 /* ============================================================
    RESPONSIVE
-============================================================ */
-
+   ============================================================ */
 @media (max-width: 980px) {
     .page {
         padding: 28px 16px 54px;
@@ -1162,14 +1070,8 @@ h2::before {
         padding: 22px;
     }
 
-    .grid {
-        grid-template-columns: 1fr;
-    }
-
-    .hero-stats {
-        grid-template-columns: 1fr;
-    }
-
+    .grid,
+    .hero-stats,
     .cards {
         grid-template-columns: 1fr;
     }
@@ -1194,8 +1096,7 @@ h2::before {
 
 /* ============================================================
    JUDGE DEMO EXTENSIONS
-============================================================ */
-
+   ============================================================ */
 .alert.success {
     margin: 18px 0;
     padding: 14px 18px;
@@ -1208,7 +1109,7 @@ h2::before {
 
 .similar-events {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 14px;
     margin-top: 16px;
 }
@@ -1227,17 +1128,10 @@ h2::before {
     margin-bottom: 12px;
 }
 
-.similar-event-top strong {
-    color: #ffffff;
-    text-transform: capitalize;
-}
+.similar-event-top strong { color: #ffffff; text-transform: capitalize; }
+.similar-event-top span   { color: #67e8f9; font-family: var(--font-mono); font-size: 12px; }
 
-.similar-event-top span {
-    color: #67e8f9;
-    font-family: var(--font-mono);
-    font-size: 12px;
-}
-
+/* Deployment order box — dark-themed large textarea */
 .deployment-order-box {
     width: 100%;
     min-height: 260px;
@@ -1251,8 +1145,17 @@ h2::before {
     font-size: 13px;
     line-height: 1.7;
     resize: vertical;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
+.deployment-order-box:focus {
+    border-color: rgba(103, 232, 249, 0.48);
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.12);
+}
+
+/* Feedback form */
 .feedback-form {
     margin-top: 18px;
 }
@@ -1261,6 +1164,44 @@ h2::before {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
+}
+
+.feedback-grid > .field:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+}
+
+/* Officer notes textarea inside feedback form */
+.feedback-form .field textarea {
+    width: 100%;
+    min-height: 110px;
+    padding: 12px 14px;
+    background: rgba(2, 6, 23, 0.52);
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 12px;
+    color: #ffffff;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+    transition:
+        border-color 0.25s ease,
+        box-shadow 0.25s ease,
+        background 0.25s ease;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.feedback-form .field textarea::placeholder {
+    color: rgba(148, 163, 184, 0.65);
+}
+
+.feedback-form .field textarea:focus {
+    border-color: var(--cyan);
+    background: rgba(2, 6, 23, 0.75);
+    box-shadow:
+        0 0 0 3px rgba(6, 182, 212, 0.15),
+        0 0 25px rgba(6, 182, 212, 0.10);
 }
 
 .secondary-btn {
@@ -1272,6 +1213,9 @@ h2::before {
     background: rgba(14, 165, 233, 0.12);
     cursor: pointer;
     font-weight: 800;
+    transition:
+        background 0.25s ease,
+        box-shadow 0.25s ease;
 }
 
 .secondary-btn:hover {
@@ -1286,12 +1230,15 @@ h2::before {
     .feedback-grid {
         grid-template-columns: 1fr;
     }
+
+    .feedback-grid > .field:last-child:nth-child(odd) {
+        grid-column: auto;
+    }
 }
 
 /* ============================================================
    HERO RESULT VIEW
-============================================================ */
-
+   ============================================================ */
 .hero-result-section {
     display: grid;
     grid-template-columns: 0.85fr 1.15fr;
@@ -1428,6 +1375,9 @@ h2::before {
     cursor: pointer;
     font-weight: 900;
     letter-spacing: 0.02em;
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 .hero-copy-btn:hover {
@@ -1523,22 +1473,7 @@ h2::before {
     content: "";
     flex: 1;
     height: 1px;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(148, 163, 184, 0.28),
-        transparent
-    );
-}
-
-.dot-live {
-    display: inline-block;
-    width: 9px;
-    height: 9px;
-    margin-right: 8px;
-    border-radius: 999px;
-    background: #22c55e;
-    box-shadow: 0 0 18px rgba(34, 197, 94, 0.85);
+    background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.28), transparent);
 }
 
 @media (max-width: 1180px) {
@@ -1576,8 +1511,7 @@ h2::before {
 
 /* ============================================================
    OPERATIONAL METRICS TRANSLATION
-============================================================ */
-
+   ============================================================ */
 .model-headline {
     margin: 12px 0 18px;
     padding: 16px 18px;
@@ -1591,7 +1525,7 @@ h2::before {
 
 .ops-metric-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: 14px;
     margin: 18px 0;
 }
@@ -1644,16 +1578,8 @@ h2::before {
     border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
-.metric-translation-row span {
-    color: #cbd5e1;
-    font-size: 13px;
-    line-height: 1.55;
-}
-
-.metric-translation-row strong {
-    color: #ffffff;
-    font-size: 13px;
-}
+.metric-translation-row span   { color: #cbd5e1; font-size: 13px; line-height: 1.55; }
+.metric-translation-row strong { color: #ffffff; font-size: 13px; }
 
 .metric-translation-head {
     background: rgba(6, 182, 212, 0.10);
@@ -1668,10 +1594,6 @@ h2::before {
 }
 
 @media (max-width: 1000px) {
-    .ops-metric-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .metric-translation-row {
         grid-template-columns: 1fr;
     }
@@ -1685,8 +1607,7 @@ h2::before {
 
 /* ============================================================
    CLUSTER FALLBACK ABLATION
-============================================================ */
-
+   ============================================================ */
 .ablation-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1732,8 +1653,7 @@ h2::before {
 
 /* ============================================================
    EIS WEIGHT CALIBRATION
-============================================================ */
-
+   ============================================================ */
 .eis-calibration-grid {
     display: grid;
     grid-template-columns: 0.8fr 1.4fr 0.8fr;
@@ -1774,23 +1694,25 @@ h2::before {
 
 /* ============================================================
    STATE-AWARE DIVERSION RANKING
-============================================================ */
-
+   ============================================================ */
 .diversion-state-table {
     display: grid;
     gap: 10px;
     margin-top: 14px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .diversion-state-row {
     display: grid;
-    grid-template-columns: 1.3fr 0.8fr 0.9fr 0.8fr 0.8fr 0.8fr;
-    gap: 12px;
+    grid-template-columns: 2fr 0.9fr 1.1fr 0.85fr 1fr 0.85fr;
+    gap: 14px;
     align-items: center;
-    padding: 13px 14px;
+    padding: 13px 16px;
     border-radius: 14px;
     background: rgba(2, 6, 23, 0.44);
     border: 1px solid rgba(148, 163, 184, 0.12);
+    min-width: 680px;
 }
 
 .diversion-state-head {
@@ -1802,51 +1724,37 @@ h2::before {
     color: #67e8f9;
     font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 12px;
+    letter-spacing: 0.05em;
+    font-size: 11px;
+    white-space: nowrap;
 }
 
-.diversion-state-row strong {
-    color: #ffffff;
-    font-size: 13px;
-}
-
-.diversion-state-row span {
-    color: #cbd5e1;
-    font-size: 13px;
-}
+.diversion-state-row strong { color: #ffffff; font-size: 13px; }
+.diversion-state-row span   { color: #cbd5e1; font-size: 13px; }
 
 @media (max-width: 900px) {
+    .diversion-state-table {
+        display: block;
+        overflow-x: auto;
+    }
+
     .diversion-state-row {
-        grid-template-columns: 1fr;
+        min-width: 640px;
     }
 }
+
 /* ============================================================
-   ACTIVE EVENT MEMORY
-============================================================ */
-
-.memory-list {
+   MODEL UNCERTAINTY — full-width confidence KV grid
+   ============================================================ */
+.card.full .confidence-kv-grid {
     display: grid;
-    gap: 10px;
-    margin-top: 14px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 16px;
 }
 
-.memory-item {
-    padding: 13px 14px;
-    border-radius: 14px;
-    background: rgba(2, 6, 23, 0.48);
-    border: 1px solid rgba(34, 211, 238, 0.14);
-}
-
-.memory-item strong {
-    display: block;
-    color: #ffffff;
-    font-size: 13px;
-    margin-bottom: 5px;
-}
-
-.memory-item span {
-    display: block;
-    color: #94a3b8;
-    font-size: 12px;
+@media (max-width: 640px) {
+    .card.full .confidence-kv-grid {
+        grid-template-columns: 1fr;
+    }
 }
