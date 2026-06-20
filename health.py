@@ -1125,7 +1125,7 @@ def main():
     print("=" * 70)
 
     check_project_structure()
-    check_imports()
+    check_git add healtimports()
     check_data_files()
     check_frontend_files()
     check_django_setup()

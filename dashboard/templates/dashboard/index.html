@@ -985,7 +985,27 @@
 
                         <p class="recommendation-text">{{ result.action }}</p>
 
-                        <h3 class="terminal-header">&gt; Historical Context Variables</h3>
+                        <div class="terminal-header history-header">
+    <span>
+        &gt; Historical Context
+        <small>
+            from trained feature store
+        </small>
+    </span>
+
+    <span class="info-tooltip">
+        ℹ️
+        <span class="tooltip-text">
+            These lag and rolling values are computed from the trained corridor-hour / spatial-cluster feature store.
+            They refresh when the model pipeline is retrained, not from per-second live telemetry.
+        </span>
+    </span>
+</div>
+
+<p class="history-note">
+    Computed from the trained corridor-hour / spatial-cluster feature store, refreshed on each retraining cycle.
+    Live newly reported incidents are handled separately through the Active Event Memory Layer.
+</p>
 
                         <div class="history-grid">
                             <div class="h-metric">
