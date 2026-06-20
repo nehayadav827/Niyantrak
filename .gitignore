@@ -44,10 +44,8 @@ media/
 # ML model artifacts
 # Keep models out of Git unless needed for demo submission
 # ============================================================
-models/*.pkl
-models/*.joblib
-models/*.cbm
-models/*.model
+models/retrain_log.json
+# keep runtime logs ignored, but allow trained model artifacts for demo deployment
 
 # If you want to keep empty models folder
 !models/.gitkeep
