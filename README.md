@@ -1,12 +1,13 @@
 # GridLock IQ — Coordinate-First Event-Driven Traffic Intelligence Engine
 
-GridLock IQ is a machine learning powered traffic intelligence system for forecasting event-driven congestion risk, estimating operational impact, recommending traffic deployment, identifying diversion routes, and visualizing affected zones on a map.
+GridLock IQ is a machine learning powered traffic intelligence system for forecasting event-driven congestion risk, estimating operational impact, recommending traffic deployment, identifying diversion routes, resolving nearest police stations, and visualizing affected zones on a map.
 
-The system is built for traffic-control scenarios such as:
+The system is designed for traffic-control scenarios such as:
 
-* Vehicle breakdowns
 * Accidents
+* Vehicle breakdowns
 * Congestion
+* Road closures
 * Public events
 * Protests
 * Processions
@@ -15,44 +16,64 @@ The system is built for traffic-control scenarios such as:
 * Sports events
 * Construction activity
 * Water logging
-* Road closures
+* Tree fall
+* Road condition issues
 
-The final system is **coordinate-first**. The user can select an event location on the map or enter latitude and longitude. The backend automatically resolves the nearest corridor, spatial cluster, hotspot distance, and nearest police station.
+The final system is **coordinate-first**. The user selects a point on the map or enters latitude and longitude. The backend automatically resolves the nearest corridor, spatial cluster, hotspot distance, police station, and road/corridor validity.
 
 ---
 
-## 1. Project Objective
+## 1. Problem Statement
 
-Traffic planning for large events and sudden incidents is often reactive. Event impact is not always quantified in advance, resource deployment is experience-driven, and post-event feedback is usually not stored in a structured way.
+Traffic planning for events and incidents is often reactive.
 
-GridLock IQ solves this by providing:
+Current challenges:
+
+* Event impact is not quantified in advance.
+* Resource deployment is experience-driven.
+* Corridor-level decisions lack real-time spatial intelligence.
+* Diversion routes may be recommended without checking alternate route risk.
+* New reported events do not affect future predictions unless the model is retrained.
+* Post-event feedback is usually not stored in structured form.
+
+GridLock IQ addresses these issues using a hybrid ML + operational intelligence pipeline.
+
+---
+
+## 2. What GridLock IQ Does
+
+GridLock IQ provides:
 
 ```text
 1. Coordinate-first event impact prediction
 2. Spatial-cluster-hour traffic forecasting
 3. Corridor-hour fallback forecasting
-4. Event Impact Score from 0 to 100
-5. Forecasted incident volume
-6. Final operational risk level
-7. Officer and barricade recommendation
-8. State-aware diversion recommendation
-9. Affected area visualization on map
-10. Nearest police station identification
-11. Model validation metrics on dashboard
-12. Historical similar event lookup
-13. Post-event feedback collection for future retraining
+4. Live active-event memory layer
+5. Event Impact Score from 0 to 100
+6. Forecasted incident volume
+7. Final operational risk level
+8. Officer and barricade recommendation
+9. State-aware diversion recommendation
+10. Affected-area visualization on map
+11. Nearest police station identification
+12. Restricted-zone / non-road location blocking
+13. Model validation metrics on dashboard
+14. Historical similar event lookup
+15. Post-event feedback collection
 ```
 
 ---
 
-## 2. Core Idea
+## 3. Core Flow
 
 ```text
 User selects event location on map
         ↓
 System extracts latitude and longitude
         ↓
-Backend validates Bengaluru coverage
+Bengaluru boundary validation
+        ↓
+Lake / park / non-road restricted zone validation
         ↓
 Nearest corridor is inferred
         ↓
@@ -66,6 +87,8 @@ Spatial ML model predicts incident risk
         ↓
 Corridor model is used as fallback if needed
         ↓
+Active recent-event memory is checked
+        ↓
 Event impact layer adjusts for live event severity
         ↓
 Final operational risk is calculated
@@ -75,7 +98,7 @@ Dashboard shows map, risk, deployment, diversion, and evidence
 
 ---
 
-## 3. Final System Architecture
+## 4. Final Architecture
 
 ```text
 Raw Traffic Event Data
@@ -94,11 +117,15 @@ Coordinate-Aware Feature Store
         ↓
 Location Resolver
         ↓
+Location Validity Guard
+        ↓
 Police Station Resolver
         ↓
 Spatial Forecast Model
         ↓
 Corridor Forecast Fallback Model
+        ↓
+Active Event Memory Layer
         ↓
 Forecast Risk Score
         ↓
@@ -113,7 +140,7 @@ Operational Dashboard
 
 ---
 
-## 4. Final Project Structure
+## 5. Clean Project Structure
 
 ```text
 gridv1/
@@ -127,7 +154,8 @@ gridv1/
 │
 ├── data/
 │   ├── events_calendar.csv
-│   └── police_stations.csv
+│   ├── police_stations.csv
+│   └── restricted_zones.csv
 │
 ├── scripts/
 │   ├── predict.py
@@ -163,7 +191,9 @@ gridv1/
 │   │   ├── __init__.py
 │   │   ├── feature_store.py
 │   │   ├── location_resolver.py
+│   │   ├── location_validity_guard.py
 │   │   ├── police_station_resolver.py
+│   │   ├── active_event_memory.py
 │   │   ├── predict_traffic_risk.py
 │   │   └── similar_events.py
 │   │
@@ -208,11 +238,11 @@ gridv1/
 
 ---
 
-## 5. Data Inputs
+## 6. Data Inputs
 
-### Main traffic dataset
+### Main Traffic Dataset
 
-The main dataset contains traffic event records.
+The main traffic dataset contains historical traffic event records.
 
 Important columns:
 
@@ -239,7 +269,7 @@ zone
 police_station
 ```
 
-Each row represents one traffic-related event.
+Each row represents one event.
 
 Example:
 
@@ -251,7 +281,7 @@ public event near Mysore Road at 17:00
 
 ---
 
-## 6. Event Calendar Data
+## 7. Event Calendar Data
 
 File:
 
@@ -261,7 +291,7 @@ data/events_calendar.csv
 
 Purpose:
 
-The system no longer treats event-driven prediction as purely hardcoded rules. Historical known events can be labelled in an event calendar and joined to training rows.
+The system can learn event-day behavior from labelled historical public events instead of depending only on hardcoded event multipliers.
 
 Expected schema:
 
@@ -272,7 +302,7 @@ Public Rally,protest,2024-02-10 09:00:00,2024-02-10 15:00:00,12.9716,77.5946,CBD
 Festival Crowd,festival,2024-01-15 17:00:00,2024-01-15 23:00:00,12.9600,77.5800,Mysore Road,2500,medium
 ```
 
-Generated ML features:
+Generated model features:
 
 ```text
 is_event_day
@@ -280,17 +310,15 @@ calendar_event_type
 calendar_event_intensity
 ```
 
-Why this matters:
+Why useful:
 
 ```text
-The model can learn that sports events, protests, festivals, and public gatherings increase incident probability near affected corridors or clusters.
+The model can learn that sports events, protests, festivals, and public gatherings increase risk near affected corridors or spatial clusters.
 ```
-
-The event calendar feature is learned by CatBoost, while live crowd and weather multipliers remain part of the operational adjustment layer.
 
 ---
 
-## 7. Police Station Data
+## 8. Police Station Data
 
 File:
 
@@ -309,37 +337,72 @@ Madiwala Traffic Police Station,12.9212,77.6175
 Whitefield Traffic Police Station,12.9698,77.7500
 ```
 
-The system uses this file to resolve:
+The system uses this to resolve:
 
 ```text
 event latitude / longitude → nearest responsible police station
 ```
 
-If official police station coordinates are not provided, the system can fall back to historical police-station incident centroids from the dataset.
+If official station coordinates are not available, the system can fall back to historical police-station incident centroids.
 
 Honest limitation:
 
 ```text
-If using historical centroids, the result estimates the nearest operational police station area, not necessarily the exact physical station building.
+When using historical centroids, the output estimates the nearest operational police station area, not necessarily the exact physical station building.
 ```
 
 ---
 
-## 8. Robust Datetime Parsing
+## 9. Restricted Zone Data
 
-The system includes robust datetime parsing.
-
-Why:
-
-Some raw rows may contain mixed datetime formats or timezone strings. A single `pd.to_datetime(..., utc=True)` pass can fail and silently drop useful rows.
-
-Fix:
+File:
 
 ```text
-First parse pass:
+data/restricted_zones.csv
+```
+
+Purpose:
+
+The system should not generate fake predictions when a user clicks inside a lake, park, or obvious non-road area.
+
+Expected schema:
+
+```csv
+zone_name,zone_type,latitude,longitude,radius_m
+Ulsoor Lake,lake,12.9822,77.6192,650
+Sankey Tank,lake,13.0067,77.5736,550
+Hebbal Lake,lake,13.0469,77.5865,750
+Bellandur Lake,lake,12.9352,77.6755,1800
+Varthur Lake,lake,12.9413,77.7412,1500
+Madiwala Lake,lake,12.9121,77.6179,900
+Agara Lake,lake,12.9216,77.6406,650
+Lalbagh Botanical Garden,park,12.9507,77.5848,900
+Cubbon Park,park,12.9763,77.5929,850
+```
+
+If a point falls inside or too close to a restricted zone, prediction is blocked.
+
+Example output:
+
+```text
+Prediction blocked.
+Selected point falls inside or very close to Ulsoor Lake.
+Please select a point on a nearby road instead.
+```
+
+---
+
+## 10. Robust Datetime Parsing
+
+The system includes robust datetime parsing because raw datasets may contain mixed datetime formats.
+
+Parsing strategy:
+
+```text
+First pass:
     pd.to_datetime(..., utc=True)
 
-Second parse pass:
+Second pass:
     pd.to_datetime(..., format="mixed", utc=True)
 ```
 
@@ -353,11 +416,11 @@ Recovered        : Y
 Still failed     : Z
 ```
 
-This improves data coverage and avoids unnecessary row loss.
+This improves data coverage by recovering rows that would otherwise be dropped.
 
 ---
 
-## 9. Corridor-Hour Dataset
+## 11. Corridor-Hour Dataset
 
 File:
 
@@ -365,7 +428,7 @@ File:
 src/forecasting/build_timeseries_dataset.py
 ```
 
-Raw event-level rows are converted into a corridor-hour time-series dataset.
+Raw event rows are converted into corridor-hour rows.
 
 Raw format:
 
@@ -390,23 +453,17 @@ After aggregation:
 ORR East 1 | 2024-04-01 09:00 | incident_count = 2
 ```
 
-Target column:
+Target:
 
 ```text
 incident_count
 ```
 
-Meaning:
-
-```text
-number of traffic incidents in a corridor during a specific hour
-```
-
-This model is retained as a fallback model.
+The corridor-hour model is used as a fallback model.
 
 ---
 
-## 10. Spatial-Cluster-Hour Dataset
+## 12. Spatial-Cluster-Hour Dataset
 
 File:
 
@@ -414,21 +471,21 @@ File:
 src/forecasting/build_spatial_timeseries_dataset.py
 ```
 
-The spatial model fixes the earlier corridor-only limitation.
+This is the primary model dataset.
 
-Old approach:
+Old behavior:
 
 ```text
 corridor × hour
 ```
 
-New primary approach:
+New behavior:
 
 ```text
 spatial_cluster_id × hour
 ```
 
-This means two different points on the same corridor can produce different predictions if they belong to different spatial clusters or local spatial contexts.
+This makes the system more point-aware. Two locations on the same corridor can produce different predictions if they belong to different spatial clusters or local traffic contexts.
 
 Spatial features include:
 
@@ -442,29 +499,30 @@ nearest_hotspot_distance_m
 spatial_density_at_point
 ```
 
-The spatial-cluster model is the primary model. The corridor-hour model remains as fallback.
-
 ---
 
-## 11. Target Distribution and Rare Events
+## 13. Time Features
 
-Traffic incident prediction is a rare-event forecasting problem.
-
-Most corridor-hour and spatial-cluster-hour rows contain zero incidents.
-
-Typical behavior:
+The model uses:
 
 ```text
-incident_count = 0 for more than 90% of rows
+hour
+weekday
+month
+hour_sin
+hour_cos
 ```
 
-Because of this, exact incident count regression is difficult. The main operational goal is early risk detection, not only perfect count prediction.
+Why use cyclical encoding:
+
+```text
+23:00 and 00:00 are close in real life, but numerically 23 and 0 look far apart.
+hour_sin and hour_cos fix this.
+```
 
 ---
 
-## 12. Lag and Rolling Features
-
-The model uses time-history features.
+## 14. Lag and Rolling Features
 
 Lag features:
 
@@ -505,9 +563,9 @@ rolling_168  = average incident count over last week
 
 ---
 
-## 13. Derived Lag Features
+## 15. Derived Lag Features
 
-Raw lag values are sparse because most hours have zero incidents. To make recent-history signal stronger, the system adds compressed lag-derived features:
+Because most lag values are zero, the system compresses sparse lag signals into stronger features:
 
 ```text
 any_incident_last_3h
@@ -517,42 +575,21 @@ above_corridor_avg
 
 Meaning:
 
-| Feature                | Meaning                                                                  |
-| ---------------------- | ------------------------------------------------------------------------ |
-| `any_incident_last_3h` | Whether any incident occurred in the last 3 hours                        |
-| `incidents_last_24h`   | Estimated incident volume in the last 24 hours                           |
-| `above_corridor_avg`   | Whether recent rolling activity is above normal corridor/cluster average |
+| Feature                | Meaning                                                          |
+| ---------------------- | ---------------------------------------------------------------- |
+| `any_incident_last_3h` | Whether any incident occurred in the last 3 hours                |
+| `incidents_last_24h`   | Estimated incident volume in the last 24 hours                   |
+| `above_corridor_avg`   | Whether recent activity is above normal corridor/cluster average |
 
 Why useful:
 
 ```text
-These features compress sparse lag signals into binary/aggregate signals that CatBoost can split on more effectively.
+These features help CatBoost use recent-history signals even when individual lag values are sparse.
 ```
 
 ---
 
-## 14. Time Features
-
-Time features:
-
-```text
-hour
-weekday
-month
-hour_sin
-hour_cos
-```
-
-Why use `hour_sin` and `hour_cos`:
-
-```text
-23:00 and 00:00 are close in real life, but numerically 23 and 0 look far apart.
-Cyclical encoding fixes this.
-```
-
----
-
-## 15. Spatial and Historical Risk Features
+## 16. Spatial and Historical Risk Features
 
 The model uses:
 
@@ -580,7 +617,7 @@ Meaning:
 
 ---
 
-## 16. Forecast Model Architecture
+## 17. Forecast Model Architecture
 
 The forecasting model uses a:
 
@@ -588,9 +625,9 @@ The forecasting model uses a:
 Zero-Inflated CatBoost Hurdle Model
 ```
 
-This is required because incident counts are highly zero-heavy.
+This is required because traffic incidents are rare and most rows contain zero incidents.
 
-It has two stages:
+The model has two stages:
 
 ```text
 Stage 1: CatBoostClassifier
@@ -613,21 +650,9 @@ Output:
 alert_probability
 ```
 
-Example:
-
-```text
-alert_probability = 0.72
-```
-
-Meaning:
-
-```text
-The model estimates a 72% chance of at least one incident.
-```
-
 ### Stage 2 — Positive Count Regressor
 
-Predicts expected incident count when incident risk exists.
+Predicts expected incident count when the alert classifier detects meaningful risk.
 
 Conceptually:
 
@@ -643,9 +668,7 @@ This avoids predicting small fake incident counts everywhere.
 
 ---
 
-## 17. Primary and Fallback Models
-
-The system uses two forecast models:
+## 18. Primary and Fallback Models
 
 ### Primary model
 
@@ -695,7 +718,7 @@ location does not have usable cluster context
 
 ---
 
-## 18. Coordinate-Aware Feature Store
+## 19. Coordinate-Aware Feature Store
 
 File:
 
@@ -724,16 +747,15 @@ hotspot points
 spatial cluster model
 spatial cluster centers
 police station points
+restricted zones
 risk thresholds
 ```
 
-Why needed:
-
-At prediction time, the user only provides event details and coordinates. The model still needs historical lag, rolling, and spatial features. The feature store supplies those features.
+At prediction time, the user only provides event details and coordinates. The feature store supplies lag, rolling, spatial, corridor, hotspot, and police station context.
 
 ---
 
-## 19. Location Resolver
+## 20. Location Resolver
 
 File:
 
@@ -749,7 +771,7 @@ longitude
 feature store
 ```
 
-Output:
+Output example:
 
 ```python
 {
@@ -777,31 +799,37 @@ spatial density calculation
 
 ---
 
-## 20. Bengaluru Boundary Validation
+## 21. Location Validity Guard
 
-The system validates coordinates against Bengaluru coverage.
-
-Invalid example:
+File:
 
 ```text
-Latitude: 28.6139
-Longitude: 77.2090
+src/inference/location_validity_guard.py
 ```
 
-This is Delhi, not Bengaluru.
+Purpose:
 
-The system returns:
+Prevents unrealistic predictions on lakes, parks, or locations too far from known road corridors.
+
+Checks:
 
 ```text
-Selected location is outside Bengaluru coverage area.
-Please choose a location within Bengaluru.
+1. Bengaluru boundary
+2. Restricted zone radius
+3. Nearest corridor distance
+4. Low-confidence far-road match
 ```
 
-This prevents false corridor matching outside the project area.
+If invalid:
+
+```text
+Prediction blocked.
+Please select a point on or near a road corridor.
+```
 
 ---
 
-## 21. Police Station Resolver
+## 22. Police Station Resolver
 
 File:
 
@@ -829,11 +857,11 @@ Output:
 }
 ```
 
-If official station coordinates are available, they are used. Otherwise, the system falls back to historical police-station incident centroids.
+If official police station coordinates are available, they are used. Otherwise, the system falls back to historical incident centroids.
 
 ---
 
-## 22. Event Impact Layer
+## 23. Event Impact Layer
 
 File:
 
@@ -841,7 +869,7 @@ File:
 src/scoring/event_impact.py
 ```
 
-The event impact layer uses live event information:
+The event impact layer uses live event details:
 
 ```text
 event_type
@@ -866,54 +894,25 @@ This layer captures live operational severity that may not exist in historical f
 
 ---
 
-## 23. Crowd Size Handling
+## 24. Crowd Size Handling
 
-Crowd size is used only for planned or crowd-bearing events.
+Crowd size can affect both planned and unplanned events.
 
-Crowd-relevant examples:
-
-```text
-public_event
-protest
-procession
-vip_movement
-festival
-sports
-political
-election
-```
-
-For unplanned events:
+Final behavior:
 
 ```text
-accident
-vehicle_breakdown
-tree_fall
-water_logging
-road_conditions
-pot_holes
-```
-
-the system treats crowd as:
-
-```text
-not_applicable
-```
-
-This prevents unrealistic risk inflation when crowd size is unknown for unplanned incidents.
-
-Behavior:
-
-```text
-Unplanned accident + unknown crowd      → crowd multiplier = 1.00
-Vehicle breakdown + unknown crowd       → crowd multiplier = 1.00
+Unplanned accident + unknown crowd       → crowd multiplier = 1.00
+Unplanned accident + large crowd         → crowd multiplier = 1.18
+Unplanned breakdown + mega crowd         → crowd multiplier = 1.30
 Planned public event + unknown crowd     → conservative medium default
-Planned protest + large crowd            → large crowd multiplier
+Planned public event + large crowd       → crowd multiplier = 1.18
 ```
+
+This means crowd size is available for unplanned events too, but it only boosts risk when the operator actually selects a crowd size.
 
 ---
 
-## 24. Weather Adjustment
+## 25. Weather Adjustment
 
 Supported weather inputs:
 
@@ -936,9 +935,9 @@ Heavy rain and fog increase traffic instability.
 
 ---
 
-## 25. Event Impact Score
+## 26. Event Impact Score
 
-The system calculates a live event impact score based on event details.
+The system calculates a live event impact score from event details.
 
 Output:
 
@@ -947,7 +946,7 @@ Event Impact Score: 72.5%
 Event Impact Level: HIGH
 ```
 
-Risk levels:
+Risk bands:
 
 ```text
 0–25     LOW
@@ -958,7 +957,7 @@ Risk levels:
 
 ---
 
-## 26. Composite EIS Score
+## 27. Composite EIS Score
 
 EIS means:
 
@@ -983,11 +982,11 @@ EIS =
   + cause_weight × cause_risk_score
 ```
 
-The EIS gives a single 0–100 score to compare different events.
+The EIS gives a single 0–100 operational impact score.
 
 ---
 
-## 27. EIS Weight Micro-Calibration
+## 28. EIS Weight Micro-Calibration
 
 File:
 
@@ -1006,7 +1005,7 @@ Purpose:
 
 Avoid choosing EIS weights blindly.
 
-The calibration tests several candidate weight combinations against a historical severity proxy.
+The calibration tests candidate weight combinations against a historical severity proxy.
 
 Severity proxy:
 
@@ -1026,11 +1025,85 @@ It provides evidence for the EIS weights and can later be replaced by officer-la
 
 ---
 
-## 28. Forecast Risk Score
+## 29. Active Event Memory Layer
+
+File:
+
+```text
+src/inference/active_event_memory.py
+```
+
+Runtime storage:
+
+```text
+data/active_event_memory.csv
+```
+
+Problem solved:
+
+```text
+Event A is reported now.
+Event B is reported later nearby.
+The ML model has not retrained yet.
+But Event A should still influence Event B.
+```
+
+Solution:
+
+The system stores every reported event with:
+
+```text
+event time
+latitude
+longitude
+corridor
+spatial cluster
+event cause
+priority
+road closure
+event score
+final score
+severity score
+```
+
+When a new event is predicted, the system checks recent nearby events and calculates recent-event pressure.
+
+Scoring logic:
+
+```text
+recent_event_pressure =
+    event_severity
+  × time_weight
+  × distance_weight
+  × corridor_relation_weight
+```
+
+Time decay:
+
+```text
+0–24 hours      → strong influence
+24–48 hours     → medium influence
+48–168 hours    → weak influence
+after 7 days    → ignored
+```
+
+Example:
+
+```text
+High priority accident 2 hours ago nearby     → strong influence
+High priority accident 36 hours ago nearby    → reduced influence
+High priority accident 4 days ago nearby      → weak influence
+```
+
+This lets new reports influence future predictions immediately without retraining the model.
+
+---
+
+## 30. Forecast Risk Score
 
 The ML model outputs expected incident count and alert probability.
 
-This is converted into an operational forecast risk score using:
+These are converted into an operational forecast risk score using:
 
 ```text
 predicted_incidents
@@ -1040,23 +1113,31 @@ incident_p99
 context multiplier
 ```
 
-Forecast risk is purely model/historical based.
+Forecast risk is model/historical based.
 
-If forecast risk is zero, it means:
+If forecast risk is zero:
 
 ```text
 The model does not expect incidents from historical corridor/cluster patterns.
 ```
 
-The final risk can still be high if the live event is severe.
+The final risk can still be high if live event impact or active-event pressure is high.
 
 ---
 
-## 29. Why Forecast Risk or Expected Incidents Can Be Zero
+## 31. Why Forecast Risk or Expected Incidents Can Be Zero
 
-Because the dataset is zero-heavy, the hurdle classifier often predicts that the current hour is below the incident threshold.
+Traffic incident data is zero-heavy.
 
-This can produce:
+Typical behavior:
+
+```text
+More than 90% of corridor-hour / cluster-hour rows have zero incidents.
+```
+
+So the hurdle classifier often predicts the current hour is below the alert threshold.
+
+Example:
 
 ```text
 Expected Incidents : 0.00
@@ -1074,7 +1155,7 @@ This is expected behavior in rare-event forecasting.
 
 ---
 
-## 30. Prediction Interval
+## 32. Prediction Interval
 
 File:
 
@@ -1112,12 +1193,13 @@ Estimated uncertainty using holdout RMSE
 Dashboard wording is honest:
 
 ```text
-Estimated uncertainty using holdout RMSE. This is a validation-error based estimate, not a guaranteed statistical interval.
+Estimated uncertainty using holdout RMSE.
+This is a validation-error based estimate, not a guaranteed statistical interval.
 ```
 
 ---
 
-## 31. Cluster Fallback Ablation Study
+## 33. Cluster Fallback Ablation Study
 
 File:
 
@@ -1133,9 +1215,9 @@ models/cluster_fallback_ablation.json
 
 Purpose:
 
-Test whether spatial-cluster fallback should replace corridor-hour history.
+Test whether spatial cluster fallback should replace corridor-hour history.
 
-Measured result example:
+Example result:
 
 ```text
 Rows tested       : 5000
@@ -1151,11 +1233,9 @@ Cluster fallback is weaker than corridor-hour history when corridor matching is 
 Therefore, cluster fallback is used only when corridor matching is weak or unavailable.
 ```
 
-This makes the fallback design evidence-based.
-
 ---
 
-## 32. State-Aware Diversion Engine
+## 34. State-Aware Diversion Engine
 
 File:
 
@@ -1163,9 +1243,9 @@ File:
 src/routing/diversion_engine.py
 ```
 
-Earlier, diversion was a static lookup.
+Earlier diversion was a static lookup.
 
-Now, the system:
+Now the system:
 
 ```text
 1. Generates alternate corridor candidates
@@ -1188,7 +1268,7 @@ This prevents recommending a diversion route that is already risky.
 
 ---
 
-## 33. Resource Recommendation
+## 35. Resource Recommendation
 
 File:
 
@@ -1211,6 +1291,7 @@ final risk level
 road closure
 predicted incidents
 event severity
+recent-event pressure
 ```
 
 Example:
@@ -1223,7 +1304,7 @@ Barricades Needed     : 2
 
 ---
 
-## 34. Historical Similar Events
+## 36. Historical Similar Events
 
 File:
 
@@ -1252,11 +1333,11 @@ closure
 similarity score
 ```
 
-This grounds the prediction in historical evidence.
+This grounds predictions in historical examples.
 
 ---
 
-## 35. Map Visualization
+## 37. Map Visualization
 
 The dashboard uses Leaflet and OpenStreetMap.
 
@@ -1281,12 +1362,45 @@ marker = event location
 This visually answers:
 
 ```text
-What area will be affected?
+What area is affected?
 ```
 
 ---
 
-## 36. Pre-Event vs Post-Event Comparison
+## 38. Manual Event Time Input
+
+The dashboard uses a clean manual event-time section instead of a raw timestamp field.
+
+Inputs:
+
+```text
+Date picker
+Hour dropdown
+Minute dropdown
+AM/PM dropdown
+Hidden event_datetime
+Selected time preview
+```
+
+The frontend sends:
+
+```text
+event_datetime = YYYY-MM-DDTHH:MM
+```
+
+The backend automatically derives:
+
+```text
+hour
+weekday
+month
+```
+
+This keeps the model input correct while improving user experience.
+
+---
+
+## 39. Pre-Event vs With-Event Comparison
 
 The dashboard compares:
 
@@ -1308,11 +1422,11 @@ Risk score
 +4.2 percentage points
 ```
 
-The incident delta is shown as an absolute difference to avoid misleading percentage spikes from small baselines.
+The incident delta is shown as an absolute value to avoid misleading percentage spikes from small baselines.
 
 ---
 
-## 37. Model Metrics
+## 40. Model Metrics
 
 The dashboard shows raw metrics and operational translations.
 
@@ -1343,7 +1457,7 @@ R²          → exact regression fit, secondary for sparse rare-event data
 
 ---
 
-## 38. Why R² Can Be Modest
+## 41. Why R² Can Be Modest
 
 This is not normal continuous regression.
 
@@ -1362,7 +1476,7 @@ ROC-AUC, recall, PR-AUC, and MAE are more important for traffic operations.
 
 ---
 
-## 39. Post-Event Feedback Collection
+## 42. Post-Event Feedback Collection
 
 File:
 
@@ -1370,7 +1484,7 @@ File:
 dashboard/services/feedback_store.py
 ```
 
-Output:
+Runtime output:
 
 ```text
 data/post_event_feedback.csv
@@ -1387,7 +1501,7 @@ actual incident count
 officer notes
 ```
 
-Important honesty note:
+Honest note:
 
 ```text
 The current prototype stores feedback for audit, analysis, and future retraining.
@@ -1402,7 +1516,7 @@ feedback collection system with retraining capability planned
 
 ---
 
-## 40. Final Training Pipeline
+## 43. Full Training Pipeline
 
 Main command:
 
@@ -1442,7 +1556,7 @@ Generated model files should not be pushed to GitHub.
 
 ---
 
-## 41. Running the Project
+## 44. Running the Project
 
 Install dependencies:
 
@@ -1475,7 +1589,7 @@ python scripts/train_quantile_intervals.py
 
 ---
 
-## 42. Dashboard Output
+## 45. Dashboard Output
 
 The dashboard shows:
 
@@ -1484,11 +1598,13 @@ Final operational risk
 EIS score
 Forecast risk
 Event impact score
+Active recent-event influence
 Expected incident count
 Prediction interval
 Map impact circles
 Nearest corridor
 Nearest police station
+Location validity status
 Historical context variables
 Officer recommendation
 Barricade recommendation
@@ -1503,7 +1619,7 @@ Post-event feedback form
 
 ---
 
-## 43. What Is ML and What Is Rule-Based?
+## 46. What Is ML and What Is Rule-Based?
 
 ### Machine Learning
 
@@ -1531,48 +1647,54 @@ risk percentiles
 spatial density
 hotspot points
 police station points
+restricted zones
 ```
 
-### Rule-Based Operational Intelligence
+### Runtime Operational Intelligence
 
 ```text
 event severity scoring
 weather adjustment
-crowd adjustment for planned events
+crowd adjustment
+active recent-event memory
 EIS formula
 resource allocation rules
 affected radius rules
 state-aware diversion ranking
 deployment order generation
 feedback storage
+location validity blocking
 ```
 
 This hybrid approach is intentional because traffic operations need explainable recommendations, not only black-box predictions.
 
 ---
 
-## 44. Known Limitations
+## 47. Known Limitations
 
 ```text
 real-time traffic API is not yet integrated
 SMS/WhatsApp/email alert sending is not yet implemented
 feedback is stored but not yet used for automatic retraining
 weather is manually selected, not API-driven
-crowd size is manually entered for planned events
+crowd size is manually selected
 similar-event lookup is heuristic
 diversion is corridor-level, not full live road-network routing
 police station matching depends on station coordinate quality
+restricted zones use radius-based blocking, not exact polygons
+active event memory is runtime state, not model retraining
 ```
 
 ---
 
-## 45. Future Improvements
+## 48. Future Improvements
 
 ```text
 integrate live traffic speed feeds
 integrate live weather API
 send automatic alerts to officers
 use OpenStreetMap road graph for dynamic diversions
+replace restricted-zone radius blocking with GeoJSON polygon containment
 use officer feedback for scheduled retraining
 add MLflow model registry
 add model drift monitoring
@@ -1584,9 +1706,9 @@ expand event calendar with official event feeds
 
 ---
 
-## 46. GitHub Notes
+## 49. GitHub Notes
 
-Do not push generated or local files:
+Do not push generated or local runtime files:
 
 ```text
 models/
@@ -1597,6 +1719,7 @@ db.sqlite3
 .env
 __pycache__/
 data/post_event_feedback.csv
+data/active_event_memory.csv
 forecast_feature_importance.png
 EIS_WEIGHT_CALIBRATION.md
 ```
@@ -1626,18 +1749,18 @@ README.md
 
 ---
 
-## 47. One-Line Summary
+## 50. One-Line Summary
 
 ```text
-Map coordinates → spatial location intelligence → CatBoost hurdle forecast → calibrated event impact score → final operational risk → map impact zone → police station, deployment, and diversion recommendation
+Map coordinates → location validation → spatial intelligence → CatBoost hurdle forecast → active recent-event memory → calibrated event impact score → final operational risk → map impact zone → police station, deployment, and diversion recommendation
 ```
 
 ---
 
-## 48. Judge Explanation
+## 51. Judge Explanation
 
 ```text
-GridLock IQ is a coordinate-first event-driven traffic intelligence system. The user selects an exact event location on a map, and the backend infers the nearest corridor, spatial cluster, hotspot distance, and police station.
+GridLock IQ is a coordinate-first event-driven traffic intelligence system. The user selects an exact event location on a map, and the backend validates whether the point is inside Bengaluru, rejects invalid non-road areas such as lakes or parks, infers the nearest corridor, spatial cluster, hotspot distance, and responsible police station.
 
 The forecasting layer uses a primary spatial-cluster-hour CatBoost hurdle model. This fixes the corridor-only limitation because coordinates are converted into spatial cluster ID, latitude/longitude, local density, hotspot distance, and distance-to-corridor features. A corridor-hour model remains as fallback.
 
@@ -1645,7 +1768,9 @@ The model is zero-inflated because traffic incidents are rare and most corridor-
 
 The system also includes event-calendar learning features, so historical sports events, protests, festivals, and public events can influence training instead of relying only on hardcoded multipliers.
 
-The final operational decision combines ML forecast risk, live event severity, road closure, weather, crowd relevance, historical cause risk, and calibrated EIS weights. The dashboard shows final risk, affected map radius, nearest police station, officers required, barricades required, state-aware diversion routes, prediction interval, similar historical events, model metrics, and feedback collection.
+For real-time behavior without retraining, the system includes an Active Event Memory Layer. Every reported event is stored with time, location, corridor, cluster, severity, priority, and closure status. When a new event is predicted, recent nearby events apply a time-decayed and distance-decayed pressure score. This allows Event A to immediately influence Event B without retraining the ML model.
+
+The final operational decision combines ML forecast risk, live event severity, road closure, weather, crowd relevance, active recent-event pressure, historical cause risk, and calibrated EIS weights. The dashboard shows final risk, affected map radius, nearest police station, officers required, barricades required, state-aware diversion routes, prediction interval, similar historical events, model metrics, and feedback collection.
 
 The prototype stores post-event feedback for audit and future retraining, but it does not claim automatic online learning yet.
 ```
