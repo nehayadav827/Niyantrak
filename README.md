@@ -57,34 +57,34 @@ Instead of requiring a known corridor name, Niyantrak resolves location intellig
                        ▼
 ┌───────────────────────────────────────────┐
 │  Location Resolver                        │  Validates Bengaluru bounds, finds the
-│                                            │  nearest corridor / cluster / hotspot.
-└────────────────────┬────────────────────────┘
+│                                           │  nearest corridor / cluster / hotspot.
+└────────────────────┬──────────────────────┘
                      │  corridor, cluster_id, confidence
                      ▼
 ┌───────────────────────────────────────────┐
 │  Coordinate-Aware Feature Store           │  Supplies lag, rolling, corridor,
-│                                            │  zone, and cluster risk features.
-└────────────────────┬────────────────────────┘
+│                                           │  zone, and cluster risk features.
+└────────────────────┬──────────────────────┘
                      │  feature vector
                      ▼
 ┌───────────────────────────────────────────┐
-│  Two-Tier Forecasting Layer                │  Primary: point-aware spatial-
-│  (spatial model → corridor-hour fallback)  │  cluster CatBoost hurdle model.
-│  Each tier: classifier + regressor +       │  Fallback: corridor-hour hurdle
-│  quantile bounds                           │  model when spatial confidence is low.
-└────────────────────┬────────────────────────┘
+│  Two-Tier Forecasting Layer               │  Primary: point-aware spatial-
+│  (spatial model → corridor-hour fallback) │  cluster CatBoost hurdle model.
+│  Each tier: classifier + regressor +      │  Fallback: corridor-hour hurdle
+│  quantile bounds                          │  model when spatial confidence is low.
+└────────────────────┬──────────────────────┘
                      │  forecast risk + 80% interval
                      ▼
 ┌───────────────────────────────────────────┐
 │  Event Impact Scoring (EIS)               │  Blends forecast risk with live event
-│                                            │  severity, crowd, weather, cause risk.
-└────────────────────┬────────────────────────┘
+│                                           │  severity, crowd, weather, cause risk.
+└────────────────────┬──────────────────────┘
                      │  EIS score + level
                      ▼
 ┌───────────────────────────────────────────┐
 │  Operational Layer                        │  Final risk, officers/barricades,
-│  (resourcing + diversion + deployment)     │  diversion routes, deployment order.
-└────────────────────┬────────────────────────┘
+│  (resourcing + diversion + deployment)    │  diversion routes, deployment order.
+└────────────────────┬──────────────────────┘
                      │
                      ▼
             Dashboard Output
