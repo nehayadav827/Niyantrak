@@ -304,6 +304,9 @@ Type `yes` when prompted. This step is required — the dashboard will fail with
 ### Step 8 — Run the dashboard
 
 ```bash
+$env:DEBUG="True"
+$env:DJANGO_SETTINGS_MODULE="traffic_web.settings"
+
 python manage.py runserver
 ```
 
